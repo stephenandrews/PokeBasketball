@@ -30,7 +30,7 @@ describe('contracts and the season budget', () => {
 
   it('salaries follow the rating', () => {
     expect(marketSalary(90)).toBeGreaterThan(marketSalary(70));
-    expect(marketSalary(40)).toBe(0.3); // the league minimum
+    expect(marketSalary(40)).toBe(0.2); // the league minimum
   });
 
   it('banks the $10M grant minus payroll at each tipoff, and ages everyone a season', () => {

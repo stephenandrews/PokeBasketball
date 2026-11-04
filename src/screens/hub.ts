@@ -399,6 +399,14 @@ export function hubScreen(root: HTMLElement, f: Franchise, settings: Settings, a
     if (swap) { swapping = swap; faPos = 'ALL'; render(); return; }
     const fp = t.closest<HTMLElement>('[data-fapos]')?.dataset.fapos;
     if (fp) { faPos = fp as Pos | 'ALL'; render(); return; }
+    // Before the row handler: the captain button lives inside a lineup row.
+    const capt = t.closest<HTMLElement>('[data-capt]')?.dataset.capt;
+    if (capt) {
+      setCaptain(f, capt);
+      act.saved();
+      render();
+      return;
+    }
     const lu = t.closest<HTMLElement>('[data-lu]')?.dataset.lu;
     if (lu && editing) {
       if (!picked || picked === lu) picked = picked === lu ? null : lu;
@@ -407,13 +415,6 @@ export function hubScreen(root: HTMLElement, f: Franchise, settings: Settings, a
         picked = null;
         act.saved();
       }
-      render();
-      return;
-    }
-    const capt = t.closest<HTMLElement>('[data-capt]')?.dataset.capt;
-    if (capt) {
-      setCaptain(f, capt);
-      act.saved();
       render();
       return;
     }

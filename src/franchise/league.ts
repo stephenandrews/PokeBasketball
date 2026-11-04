@@ -205,8 +205,8 @@ const RUST_PENALTY = 2;
 
 export const fmtM = (v: number) => `$${(Math.round(v * 10) / 10).toFixed(1)}M`;
 
-/** Market salary in $M per season for a player of this rating. */
-export const marketSalary = (ovr: number) => Math.max(0.3, Math.round(Math.max(0, ovr - 55) * 0.55) / 10);
+/** Market salary in $M per season for a player of this rating. A strong ten-man roster runs ~$7-8M. */
+export const marketSalary = (ovr: number) => Math.max(0.2, Math.round(Math.max(0, ovr - 55) * 0.25) / 10);
 
 export const salaryOf = (f: Franchise, uid: string): number => f.players[uid].salary ?? marketSalary(monOf(f, uid).ovr);
 

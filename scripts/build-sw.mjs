@@ -86,13 +86,24 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // Everything else (bundle, fonts, sprites, audio): cache first, fill the cache from the
-  // network on a miss.
+  // Media that never changes between builds (sprites, audio, badges, fonts): cache first
+  // into the long-lived runtime cache.
+  if (/^(sprites|announcer|ranks)\//.test(path) || path.endsWith('.woff2')) {
+    e.respondWith(
+      caches.match(req, { ignoreSearch: true }).then((hit) => hit || fetch(req).then((res) => {
+        if (cacheable(res)) { const copy = res.clone(); caches.open(RUNTIME).then((c) => c.put(req, copy)); }
+        return res;
+      })),
+    );
+    return;
+  }
+
+  // Code and pages (the game bundle, CSS, root scripts): only this build's precache may answer,
+  // never the long-lived cache — a stale bundle must not outlive an update. Miss = network.
   e.respondWith(
-    caches.match(req, { ignoreSearch: true }).then((hit) => hit || fetch(req).then((res) => {
-      if (cacheable(res)) { const copy = res.clone(); caches.open(RUNTIME).then((c) => c.put(req, copy)); }
-      return res;
-    })),
+    caches.open(SHELL)
+      .then((c) => c.match(req, { ignoreSearch: true }))
+      .then((hit) => hit || fetch(req)),
   );
 });
 `;

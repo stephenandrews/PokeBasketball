@@ -34,7 +34,7 @@ export function trainingHtml(best: BestStars): string {
     <div class="training">
       <header class="draft-head">
         <button class="btn ghost small" data-trn="back">Menu</button>
-        <div class="status"><span class="round">POKé JAM</span><span class="otc">Training</span></div>
+        <div class="status"><span class="round">POKéBBALL</span><span class="otc">Training</span></div>
       </header>
       <h1 class="trn-h" id="trn-h">Training</h1>
       <p class="note">Pick a drill or run all ${DRILL_IDS.length}. Earn up to 3 stars each · ${total}/${DRILL_IDS.length * 3} stars</p>

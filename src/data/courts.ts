@@ -96,7 +96,7 @@ export function privateCourt(name: string): CourtStyle {
 export function courtFor(team: { name: string; color: string; color2: string }): CourtStyle {
   return COURTS[team.name] ?? {
     venue: `${team.name} Arena`, wood: '#d99a5b', paint: team.color, apron: team.color2, lines: '#faf7ee', logo: 'pokeball',
-    floorText: team.name.toUpperCase(), board: `${team.name.toUpperCase()} ★ POKé JAM ★ SILPH CO. ★ POKé MART`, boardColor: '#ffcb05',
+    floorText: team.name.toUpperCase(), board: `${team.name.toUpperCase()} ★ POKéBBALL ★ SILPH CO. ★ POKé MART`, boardColor: '#ffcb05',
     crowd: [team.color, team.color, ...STANDS],
   };
 }

@@ -41,7 +41,7 @@ export function multiplayerHub(ctx: Omit<ModeContext, 'back'>, onExit: () => voi
     root.innerHTML = `
       <div class="menu hub">
         <header class="title">
-          <h1 class="logo"><span class="logo-poke">ONLINE</span><span class="logo-jam">JAM</span></h1>
+          <h1 class="logo"><span class="logo-poke">ONLINE</span><span class="logo-jam">BBALL</span></h1>
           <p class="tag">Play other trainers online.</p>
         </header>
         <div class="menu-grid hub-grid">

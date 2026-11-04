@@ -54,7 +54,7 @@ export function rosterScreen(root: HTMLElement, onBack: () => void) {
     <div class="rosterdex">
       <header class="draft-head">
         <button class="btn ghost small" data-a="back">Menu</button>
-        <div class="status"><span class="round">POKé JAM</span><span class="otc">Full roster</span></div>
+        <div class="status"><span class="round">POKéBBALL</span><span class="otc">Full roster</span></div>
       </header>
       <div class="rd-controls">
         <div class="filters" role="group" aria-label="Position">

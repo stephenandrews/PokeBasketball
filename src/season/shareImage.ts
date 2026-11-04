@@ -47,7 +47,7 @@ export async function renderShareCard(t: SharedTeam): Promise<HTMLCanvasElement>
   ctx.textBaseline = 'alphabetic';
   ctx.fillStyle = '#ffcb05';
   ctx.font = `30px ${pixel}`;
-  ctx.fillText('POKé JAM', 56, 100);
+  ctx.fillText('POKéBBALL', 56, 100);
   ctx.fillStyle = '#9aa0c8';
   ctx.font = `700 34px ${sans}`;
   ctx.textAlign = 'right';
@@ -153,7 +153,7 @@ export async function renderDraftCard(t: SharedTeam): Promise<HTMLCanvasElement>
 
   ctx.fillStyle = '#ffcb05';
   ctx.font = `30px ${pixel}`;
-  ctx.fillText('POKé JAM', 56, 92);
+  ctx.fillText('POKéBBALL', 56, 92);
   ctx.fillStyle = '#9aa0c8';
   ctx.font = `700 34px ${sans}`;
   ctx.textAlign = 'right';

@@ -1302,7 +1302,7 @@ function retroBug() {
   chromeText('POKé CENTER', x + 170, y + 38, 50);
 }
 
-const TICKER = `POKé JAM · FREE IN YOUR BROWSER · DRAFT ${POKEMON.length} POKéMON · RUN A FRANCHISE · BEAT THE ELITE FOUR · PLAY AT POKEJAM.XYZ · $PJAM · `;
+const TICKER = `POKéBBALL · FREE IN YOUR BROWSER · DRAFT ${POKEMON.length} POKéMON · RUN A FRANCHISE · BEAT THE ELITE FOUR · PLAY AT POKEBBALL.ZUBLO.AI · $PJAM · `;
 /** Scrolling ticker along the bottom. */
 function ticker(t: number) {
   ctx.save();
@@ -1378,7 +1378,7 @@ function renderROutro(seg: Segment, t: number, a: number) {
     const s = pj < 0.3 ? 0.3 + 0.7 * easeOutBack(pj / 0.3) : 1 + 0.02 * Math.sin(pj * 6);
     chromeText('$PJAM', W / 2, H / 2 - 40, 260, { scale: s, gold: true });
     flare(W / 2 + 280, H / 2 - 120, pj > 0.25 && pj < 1.2 ? 1 - (pj - 0.25) / 0.95 : 0);
-    if (pj > 0.5) chromeText('POKé JAM', W / 2, H - 200, 70);
+    if (pj > 0.5) chromeText('POKéBBALL', W / 2, H - 200, 70);
   }
   fadeOut(seg, t, 0.5);
 }
@@ -1716,7 +1716,7 @@ function boosterPack(x: number, y: number, s: number, rot: number, t: number, gl
   ctx.fillStyle = '#ffcb05';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('POKé JAM', 0, -ph / 2 + 60);
+  ctx.fillText('POKéBBALL', 0, -ph / 2 + 60);
   ctx.font = `150px ${PIXEL}`;
   ctx.fillStyle = '#000';
   ctx.fillText('?', 8, 28);
@@ -2039,12 +2039,12 @@ function drillMarkers(drill: TrainingDrill, sg: SeededGame): Marker[] {
   return to ? [{ kind: 'lane', from: me.id, to: to.id }] : [];
 }
 
-/** "NEW TO POKé JAM?" then "TRAINING IS HERE." */
+/** "NEW TO POKéBBALL?" then "TRAINING IS HERE." */
 function renderTrHook(seg: Segment, t: number, a: number) {
   renderBackground(t, 0.72);
   const pop = (at: number) => 0.3 + 0.7 * easeOutBack(clamp01((a - at) / 0.22));
   once('trh1', t, seg.t0 + 0.05, () => { flash = 0.12; cue(t, 'slam'); cue(t, 'crowd_low'); });
-  jamText('NEW TO POKé JAM?', W / 2, 300, 130, { scale: pop(0.05), fill: '#f8f8f0' });
+  jamText('NEW TO POKéBBALL?', W / 2, 300, 130, { scale: pop(0.05), fill: '#f8f8f0' });
   if (a > 0.8) {
     once('trh2', t, seg.t0 + 0.8, () => { flash = 0.25; cue(t, 'slam'); cue(t, 'crowd_big'); });
     const shake = a < 1.2 ? (Math.random() - 0.5) * 20 : 0;

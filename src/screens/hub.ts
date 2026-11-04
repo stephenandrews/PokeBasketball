@@ -1,6 +1,6 @@
 import { POSITIONS, monByDex, spriteUrl, type Pos } from '../data/pokemon';
 import {
-  ROSTER_MAX, ROSTER_MIN, SALARY_CAP, acceptOffer, badgesEarned, canSign, canTrade, cashOf, declineOffer, finalWeek, fmtM, judgeTrade, lineupOf, makeTrade, payrollOf, resetLineup, salaryOf, setCaptain, signingFee, swapInLineup, tradeDeadline, venueOf, monOf, perGame, sign, standings, teamOvrOf, userGame, weekGames, weekLabel,
+  ROSTER_MAX, ROSTER_MIN, SALARY_CAP, acceptOffer, badgesEarned, canSign, canTrade, cashOf, declineOffer, finalWeek, fmtM, judgeTrade, lineupOf, makeTrade, offerValid, payrollOf, resetLineup, salaryOf, setCaptain, signingFee, swapInLineup, tradeDeadline, venueOf, monOf, perGame, sign, standings, teamOvrOf, userGame, weekGames, weekLabel,
   xpToNext, type FGame, type FTeam, type Franchise,
 } from '../franchise/league';
 import { badgeSvg } from '../ui/badges';
@@ -109,27 +109,38 @@ export function nextCard(f: Franchise, settings: Settings): string {
     </section>`;
 }
 
-/** A rival GM's trade offer, if one came in this week. */
-function offerHtml(f: Franchise): string {
-  const o = f.offers?.[0];
-  if (!o || !canTrade(f)) return '';
-  const them = f.teams[o.team];
+/** This week's trade offers from rival GMs: an inbox, each deal taken or left on its own. */
+function offersHtml(f: Franchise): string {
+  const offers = (f.offers ?? []).filter((o) => offerValid(f, o));
+  if (!offers.length || !canTrade(f)) return '';
+  const me = f.teams[0];
   const who = (u: string) => {
     const m = monOf(f, u);
     return `<li><img src="${spriteUrl(m.dex)}" alt=""><span>${esc(m.name)}<small>${m.pos} · Lv ${f.players[u].level} · ${fmtM(salaryOf(f, u))}/yr</small><span class="types">${typeChips(m)}</span></span><b class="t-${tier(m.ovr)}">${m.ovr}</b></li>`;
   };
+  const sal = (us: string[]) => us.reduce((a, u) => a + salaryOf(f, u), 0);
+  const one = (o: import('../franchise/league').TradeOffer, i: number) => {
+    const them = f.teams[o.team];
+    const after = Math.round((payrollOf(f, me) - sal(o.get) + sal(o.give)) * 10) / 10;
+    return `
+      <article class="offer" style="--tc:${them.color}">
+        <h4 class="offer-head">${esc(them.leader ?? them.name)} · <small>${esc(them.name)}</small></h4>
+        <div class="offer-cols">
+          <div><h4>You get</h4><ul>${o.give.map(who).join('')}</ul></div>
+          <div><h4>You give</h4><ul>${o.get.map(who).join('')}</ul></div>
+        </div>
+        <p class="cap-line ${after > SALARY_CAP ? 'over' : ''}">Your payroll after: <b>${fmtM(after)}</b> of the ${fmtM(SALARY_CAP)} cap</p>
+        <div class="actions">
+          <button class="btn primary" data-offer-accept="${i}">Accept trade</button>
+          <button class="btn ghost" data-offer-decline="${i}">Decline</button>
+        </div>
+      </article>`;
+  };
   return `
-    <section class="card offer" style="--tc:${them.color}">
-      <h3 class="sec">Trade offer · ${esc(them.name)}</h3>
-      <p class="note">${esc(them.leader ?? them.name)} offers:</p>
-      <div class="offer-cols">
-        <div><h4>You get</h4><ul>${o.give.map(who).join('')}</ul></div>
-        <div><h4>You give</h4><ul>${o.get.map(who).join('')}</ul></div>
-      </div>
-      <div class="actions">
-        <button class="btn primary" data-a="offer-accept">Accept trade</button>
-        <button class="btn ghost" data-a="offer-decline">Decline</button>
-      </div>
+    <section class="card offers">
+      <h3 class="sec">Trade offers <b>${offers.length}</b></h3>
+      <p class="note">This week's calls from around the league. Take a deal, or let it expire when the week ends.</p>
+      <div class="offer-list">${offers.map((o) => one(o, f.offers!.indexOf(o))).join('')}</div>
     </section>`;
 }
 
@@ -377,7 +388,7 @@ export function hubScreen(root: HTMLElement, f: Franchise, settings: Settings, a
           ${f.signature ? `<img class="owner-sig" src="${f.signature}" alt="Owner's signature" title="The owner's signature, from the day the franchise was founded">` : ''}
         </header>
         ${nextCard(f, settings)}
-        ${offerHtml(f)}
+        ${offersHtml(f)}
         ${badgeCaseHtml(f)}
         <div class="hub-grid">
           <div class="col">${rosterHtml(f, editing, picked)}${scoresHtml(f)}</div>
@@ -447,11 +458,13 @@ export function hubScreen(root: HTMLElement, f: Franchise, settings: Settings, a
       }
       if (give || get || team || !trading) { render(); return; }
     }
+    const oa = t.closest<HTMLElement>('[data-offer-accept]')?.dataset.offerAccept;
+    if (oa !== undefined) { acceptOffer(f, Number(oa)); act.saved(); render(); return; }
+    const od = t.closest<HTMLElement>('[data-offer-decline]')?.dataset.offerDecline;
+    if (od !== undefined) { declineOffer(f, Number(od)); act.saved(); render(); return; }
     const a = t.closest<HTMLElement>('[data-a]')?.dataset.a;
     const g = userGame(f);
     if (a === 'trade') { trading = { team: 1, give: [], get: [] }; render(); return; }
-    if (a === 'offer-accept') { acceptOffer(f); act.saved(); render(); return; }
-    if (a === 'offer-decline') { declineOffer(f); act.saved(); render(); return; }
     if (a === 'lineup-edit') { editing = true; picked = null; render(); return; }
     if (a === 'lineup-done') { editing = false; picked = null; render(); return; }
     if (a === 'lineup-auto') { resetLineup(f); editing = false; picked = null; act.saved(); render(); return; }

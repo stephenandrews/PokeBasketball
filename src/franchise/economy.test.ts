@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { POKEMON, type Mon } from '../data/pokemon';
 import {
-  LEAGUE, PRACTICE_XP, SEASON_BUDGET, acceptOffer, cashOf, createFranchise, declineOffer, grantPracticeXp, judgeTrade, makeTrade, marketSalary, maybeAiOffer, tradeValue,
+  LEAGUE, PRACTICE_XP, SEASON_BUDGET, acceptOffer, cashOf, createFranchise, declineOffer, grantPracticeXp, judgeTrade, makeTrade, marketSalary, makeOffers, MAX_OFFERS, aiLeagueTrades, offerValid, tradeValue,
   monOf, nextSeason, payrollOf, retirementChance, runRetirements, salaryOf, setCaptain, sign, teamDef, type Franchise,
 } from './league';
 
@@ -182,40 +182,67 @@ describe('trades under the cap', () => {
 });
 
 describe('AI trade offers', () => {
-  it('a rival GM calls with an offer that is at least fair', () => {
+  it('every GM tries every week and the inbox holds several fair offers', () => {
     const f = league();
-    maybeAiOffer(f, () => 0.1); // rng: passes the 40% gate, picks team 1 and target 0
-    const o = f.offers?.[0];
-    expect(o).toBeTruthy();
-    expect(f.teams[0].roster).toContain(o!.get[0]);
-    expect(f.teams[o!.team].roster).toContain(o!.give[0]);
+    let seed = 7;
+    const rng = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+    makeOffers(f, rng);
+    const offers = f.offers ?? [];
+    expect(offers.length).toBeGreaterThanOrEqual(2);
+    expect(offers.length).toBeLessThanOrEqual(MAX_OFFERS);
+    for (const o of offers) {
+      expect(f.teams[0].roster).toContain(o.get[0]);
+      for (const u of o.give) expect(f.teams[o.team].roster).toContain(u);
+      // At least fair for the user in raw value.
+      const got = o.give.reduce((a, u) => a + tradeValue(f, u), 0);
+      const gave = o.get.reduce((a, u) => a + tradeValue(f, u), 0);
+      expect(got).toBeGreaterThanOrEqual(gave * 0.92); // near-even calls go out; you can always decline
+      expect(offerValid(f, o)).toBe(true);
+    }
   });
 
-  it('accepting swaps the players, no cash involved', () => {
+  it('a fresh franchise already has offers waiting', () => {
     const f = league();
-    maybeAiOffer(f, () => 0.1);
+    expect((f.offers ?? []).length).toBeGreaterThan(0);
+  });
+
+  it('accepting one swaps the players, pays no cash, and drops offers the deal broke', () => {
+    const f = league();
+    let seed = 7;
+    makeOffers(f, () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646);
     const o = f.offers![0];
     const { give, get, team } = o;
     const myCash = cashOf(f.teams[0]);
-    expect(acceptOffer(f)).toBe(true);
+    expect(acceptOffer(f, 0)).toBe(true);
     for (const u of give) expect(f.teams[0].roster).toContain(u);
     expect(f.teams[team].roster).toContain(get[0]);
     expect(cashOf(f.teams[0])).toBe(myCash);
-    expect(f.offers).toEqual([]);
+    for (const left of f.offers ?? []) expect(offerValid(f, left)).toBe(true);
   });
 
-  it('declining just clears it', () => {
+  it('declining removes just that offer', () => {
     const f = league();
-    maybeAiOffer(f, () => 0.1);
-    declineOffer(f);
-    expect(f.offers).toEqual([]);
-    expect(acceptOffer(f)).toBe(false);
+    let seed = 7;
+    makeOffers(f, () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646);
+    const n = f.offers!.length;
+    declineOffer(f, 0);
+    expect(f.offers).toHaveLength(n - 1);
   });
+});
 
-  it('most weeks nobody calls', () => {
+describe('the rest of the league trades too', () => {
+  it('AI teams swap players under the cap, and the user is never involved', () => {
     const f = league();
-    maybeAiOffer(f, () => 0.9);
-    expect(f.offers ?? []).toEqual([]);
+    const mine = [...f.teams[0].roster];
+    const before = f.teams.slice(1).map((t) => [...t.roster]);
+    let seed = 1;
+    const rng = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+    for (let w = 0; w < 6; w++) aiLeagueTrades(f, rng); // several weeks of phone calls
+    expect(f.teams[0].roster).toEqual(mine);
+    const after = f.teams.slice(1).map((t) => [...t.roster]);
+    expect(after.some((r, i) => r.join() !== before[i].join())).toBe(true); // somebody dealt
+    for (const t of f.teams) expect(t.roster.length).toBe(10); // one-for-one swaps only
+    expect(f.news.some((n) => n.startsWith('Trade!'))).toBe(true);
   });
 });
 

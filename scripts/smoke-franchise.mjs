@@ -44,6 +44,15 @@ check('Practice button', hub.includes('data-a="practice"'));
 check('salaries on roster rows', /\$\d+\.\dM\/yr/.test(hub));
 check('type chips on roster rows', (await page.$$('.roster-tbl .types i')).length > 0);
 
+// Trade offers inbox: a fresh franchise already has calls waiting, each with its own buttons.
+const offerCount = (await page.$$('.offers .offer')).length;
+check(`trade offers waiting on day one (${offerCount})`, offerCount >= 1);
+check('each offer has accept/decline', (await page.$$('.offers [data-offer-accept]')).length === offerCount);
+if (offerCount) {
+  await page.click('.offers [data-offer-decline]');
+  check('declining removes one offer', (await page.$$('.offers .offer')).length === offerCount - 1);
+}
+
 // Captain: edit lineup → make the first player captain.
 await page.click('[data-a="lineup-edit"]');
 await page.click('.roster-tbl [data-capt]');

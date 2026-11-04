@@ -386,6 +386,7 @@ export function createFranchise(
     history: [],
   };
   ensureEconomy(f);
+  makeOffers(f); // the phones ring from week one
   return f;
 }
 
@@ -680,7 +681,9 @@ export function advance(f: Franchise) {
   f.offers = [];
   if (f.phase === 'season' && f.week < seasonWeeks(f)) {
     f.week++;
-    maybeAiOffer(f);
+    // The league's trade machine turns over every week: GM calls for the user, deals elsewhere.
+    aiLeagueTrades(f);
+    makeOffers(f);
   } else if (f.phase === 'season') {
     const seeds = standings(f).slice(0, 4).map((t) => t.id);
     f.phase = 'playoffs';
@@ -770,6 +773,7 @@ export function nextSeason(f: Franchise) {
   }
   const me = f.teams[0];
   f.news.push(`League grant: every team banks ${fmtM(SEASON_BUDGET)}. Your payroll is ${fmtM(payrollOf(f, me))}; you have ${fmtM(cashOf(me))}.`);
+  makeOffers(f); // opening week: the phones are already ringing
 }
 
 export const canSign = (f: Franchise) => f.phase !== 'done' && f.signedWeek < f.week;
@@ -857,17 +861,21 @@ export function judgeTrade(f: Franchise, teamId: number, give: string[], get: st
   return { ok: false, lean, reason: `${who}: "Not even close."` };
 }
 
-/** Moves the players with no questions asked. New arrivals join the end of the user's depth chart. */
-function swapPlayers(f: Franchise, teamId: number, give: string[], get: string[]) {
-  const me = f.teams[0];
-  const them = f.teams[teamId];
-  me.roster = [...me.roster.filter((u) => !give.includes(u)), ...get];
-  them.roster = [...them.roster.filter((u) => !get.includes(u)), ...give];
-  if (me.lineup) me.lineup = [...me.lineup.filter((u) => !give.includes(u)), ...get];
-  delete them.lineup;
-  if (me.captain && give.includes(me.captain)) delete me.captain;
-  if (them.captain && get.includes(them.captain)) delete them.captain;
+/** Moves players between any two teams, no questions asked. The user's new arrivals join the end of the depth chart. */
+function swapBetween(ta: FTeam, tb: FTeam, fromA: string[], fromB: string[]) {
+  ta.roster = [...ta.roster.filter((u) => !fromA.includes(u)), ...fromB];
+  tb.roster = [...tb.roster.filter((u) => !fromB.includes(u)), ...fromA];
+  for (const [t, out, inn] of [[ta, fromA, fromB], [tb, fromB, fromA]] as const) {
+    if (t.lineup) {
+      if (t.human) t.lineup = [...t.lineup.filter((u) => !out.includes(u)), ...inn];
+      else delete t.lineup;
+    }
+    if (t.captain && out.includes(t.captain)) delete t.captain;
+  }
 }
+
+const swapPlayers = (f: Franchise, teamId: number, give: string[], get: string[]) =>
+  swapBetween(f.teams[0], f.teams[teamId], give, get);
 
 export function makeTrade(f: Franchise, teamId: number, give: string[], get: string[]): boolean {
   if (!judgeTrade(f, teamId, give, get).ok) return false;
@@ -879,61 +887,123 @@ export function makeTrade(f: Franchise, teamId: number, give: string[], get: str
   return true;
 }
 
+/** The most trade offers sitting in the user's inbox at once. */
+export const MAX_OFFERS = 4;
+
 /**
- * Once a week during the season a rival GM may call with an offer for one of your three most
- * tempting players: their closest player in value, with a second thrown in when one isn't
- * enough. Offers that can't be made at least fair for you, or that break the cap or the
- * roster bounds on either side, never go out.
+ * One GM's attempt at an offer for `want`: their closest player in value, with their cheapest
+ * piece thrown in when one isn't enough. The package must be at least fair for you, not a
+ * giveaway for them, and work under the cap and roster bounds on both sides — or no call.
  */
-export function maybeAiOffer(f: Franchise, rng: () => number = Math.random) {
-  if (!canTrade(f) || f.phase !== 'season' || rng() >= 0.4) return;
+function buildOffer(f: Franchise, them: FTeam, want: string): TradeOffer | null {
   const me = f.teams[0];
-  const them = f.teams[1 + Math.floor(rng() * (f.teams.length - 1))];
-  if (!them || them.human) return;
-  const targets = [...me.roster].sort((a, b) => tradeValue(f, b, them) - tradeValue(f, a, them)).slice(0, 3);
-  const want = targets[Math.floor(rng() * targets.length)];
-  if (!want) return;
   // What the trade is worth to YOU: their players straight up, no type bonus.
   const myView = (us: string[]) => us.reduce((a, u) => a + tradeValue(f, u), 0);
+  const theirView = (us: string[]) => us.reduce((a, u) => a + tradeValue(f, u, them), 0);
   const wantVal = tradeValue(f, want);
   const closest = [...them.roster].sort((a, b) =>
     Math.abs(tradeValue(f, a) - wantVal) - Math.abs(tradeValue(f, b) - wantVal));
-  let give = closest.slice(0, 1);
-  // One player short of fair? They throw in their cheapest piece to close the gap.
-  if (myView(give) < wantVal && closest.length > 1) {
-    const filler = [...closest.slice(1)].sort((a, b) => tradeValue(f, a) - tradeValue(f, b))[0];
-    give = [...give, filler];
+  const fillers = [...them.roster].sort((a, b) => tradeValue(f, a) - tradeValue(f, b));
+  const packages = [
+    closest.slice(0, 1),
+    closest.slice(1, 2),
+    ...fillers.slice(0, 3).map((x) => [closest[0], x]).filter(([a, b]) => a !== b),
+  ].filter((p) => p.length && p[0]);
+  for (const give of packages) {
+    if (myView(give) < wantVal * 0.92) continue; // clearly unfair for you: not worth a call
+    const relief = sumSalary(f, give) - sumSalary(f, [want]); // salary they shed
+    // Not a giveaway for them either: the player they covet plus any cap relief must come close.
+    if ((theirView([want]) + Math.max(0, relief) * SALARY_VALUE) / (theirView(give) + Math.max(0, -relief) * SALARY_VALUE) < 0.85) continue;
+    if (!fitsCap(f, me, sumSalary(f, [want]), sumSalary(f, give)) || !fitsCap(f, them, sumSalary(f, give), sumSalary(f, [want]))) continue;
+    if (me.roster.length - 1 + give.length > ROSTER_MAX || them.roster.length - give.length + 1 < ROSTER_MIN) continue;
+    return { team: them.id, give, get: [want], week: f.week };
   }
-  if (myView(give) < wantVal) return; // still not fair for you: no call
-  const giveSal = sumSalary(f, give);
-  const wantSal = sumSalary(f, [want]);
-  if (!fitsCap(f, me, wantSal, giveSal) || !fitsCap(f, them, giveSal, wantSal)) return;
-  const myCount = me.roster.length - 1 + give.length;
-  const theirCount = them.roster.length - give.length + 1;
-  if (myCount > ROSTER_MAX || theirCount < ROSTER_MIN) return;
-  f.offers = [{ team: them.id, give, get: [want], week: f.week }];
-  f.news.unshift(`${them.leader ?? them.name} called with a trade offer for ${monOf(f, want).name}.`);
-  f.news = f.news.slice(0, 8);
+  return null;
 }
 
-/** Takes the rival GM's standing offer. Their offer, their terms: no judging, just the books. */
-export function acceptOffer(f: Franchise): boolean {
-  const o = f.offers?.[0];
-  if (!o || !canTrade(f)) return false;
+/**
+ * The week's trade calls: EVERY rival GM tries to put an offer together for one of your five
+ * most tempting players (a different target each). The inbox keeps the best few.
+ */
+export function makeOffers(f: Franchise, rng: () => number = Math.random) {
+  f.offers = [];
+  if (!canTrade(f) || f.phase !== 'season') return;
+  const me = f.teams[0];
+  const offers: TradeOffer[] = [];
+  for (const them of f.teams) {
+    if (them.human) continue;
+    const targets = [...me.roster].sort((a, b) => tradeValue(f, b, them) - tradeValue(f, a, them)).slice(0, 5);
+    const want = targets[Math.floor(rng() * targets.length)];
+    if (!want) continue;
+    const o = buildOffer(f, them, want);
+    if (o) offers.push(o);
+  }
+  // Keep the richest few for the inbox.
+  const gain = (o: TradeOffer) => o.give.reduce((a, u) => a + tradeValue(f, u), 0) - o.get.reduce((a, u) => a + tradeValue(f, u), 0);
+  f.offers = offers.sort((a, b) => gain(b) - gain(a)).slice(0, MAX_OFFERS);
+  if (f.offers.length) {
+    f.news.unshift(`${f.offers.length} trade offer${f.offers.length > 1 ? 's' : ''} came in this week.`);
+    f.news = f.news.slice(0, 8);
+  }
+}
+
+/** Whether a standing offer still works: everyone still rostered and the books still balance. */
+export function offerValid(f: Franchise, o: TradeOffer): boolean {
   const me = f.teams[0];
   const them = f.teams[o.team];
-  // The rosters may have shifted since they called: the books still have to work.
-  if (!o.get.every((u) => me.roster.includes(u)) || !o.give.every((u) => them.roster.includes(u))) { f.offers = []; return false; }
-  if (!fitsCap(f, me, sumSalary(f, o.get), sumSalary(f, o.give))) { f.offers = []; return false; }
+  if (!o.get.every((u) => me.roster.includes(u)) || !o.give.every((u) => them.roster.includes(u))) return false;
+  if (!fitsCap(f, me, sumSalary(f, o.get), sumSalary(f, o.give))) return false;
+  if (me.roster.length - o.get.length + o.give.length > ROSTER_MAX) return false;
+  if (them.roster.length - o.give.length + o.get.length < ROSTER_MIN) return false;
+  return true;
+}
+
+/** Takes a standing offer by inbox position. Their offer, their terms: no judging, just the books. */
+export function acceptOffer(f: Franchise, i = 0): boolean {
+  const o = f.offers?.[i];
+  if (!o || !canTrade(f) || !offerValid(f, o)) {
+    if (f.offers) f.offers = f.offers.filter((x) => offerValid(f, x));
+    return false;
+  }
+  const them = f.teams[o.team];
   swapPlayers(f, o.team, o.get, o.give);
   const names = (us: string[]) => us.map((u) => monOf(f, u).name).join(' and ');
   f.news.unshift(`Trade! ${them.name} send ${names(o.give)} to ${f.teams[0].name} for ${names(o.get)}.`);
   f.news = f.news.slice(0, 8);
-  f.offers = [];
+  // The deal may have invalidated other offers (same player, cap room): drop the dead ones.
+  f.offers = (f.offers ?? []).filter((x, j) => j !== i && offerValid(f, x));
   return true;
 }
 
-export const declineOffer = (f: Franchise) => { f.offers = []; };
+export const declineOffer = (f: Franchise, i = 0) => { f.offers = (f.offers ?? []).filter((_, j) => j !== i); };
+
+/**
+ * The rest of the league trades too: each week a couple of AI pairs look for a value-for-value
+ * swap (type fit counts) that works under the cap, and pull the trigger. News only for the user.
+ */
+export function aiLeagueTrades(f: Franchise, rng: () => number = Math.random) {
+  if (!canTrade(f) || f.phase !== 'season') return;
+  const ais = f.teams.filter((t) => !t.human);
+  let trades = 0;
+  for (let attempt = 0; attempt < 4 && trades < 2; attempt++) {
+    const a = ais[Math.floor(rng() * ais.length)];
+    const b = ais[Math.floor(rng() * ais.length)];
+    if (!a || !b || a.id === b.id || rng() >= 0.5) continue;
+    const pa = a.roster[Math.floor(rng() * a.roster.length)];
+    if (!pa) continue;
+    // B's best match in value; both sides must come out roughly even in their own eyes.
+    const pb = [...b.roster].sort((x, y) =>
+      Math.abs(tradeValue(f, x) - tradeValue(f, pa)) - Math.abs(tradeValue(f, y) - tradeValue(f, pa)))[0];
+    if (!pb) continue;
+    const okFor = (t: FTeam, inn: string, out: string) => tradeValue(f, inn, t) >= tradeValue(f, out, t) * 0.9;
+    if (!okFor(a, pb, pa) || !okFor(b, pa, pb)) continue;
+    if (!fitsCap(f, a, salaryOf(f, pa), salaryOf(f, pb)) || !fitsCap(f, b, salaryOf(f, pb), salaryOf(f, pa))) continue;
+    swapBetween(a, b, [pa], [pb]);
+    f.news.unshift(`Trade! ${a.name} send ${monOf(f, pa).name} to ${b.name} for ${monOf(f, pb).name}.`);
+    trades++;
+  }
+  if (trades) f.news = f.news.slice(0, 8);
+}
 
 /** Signing a free agent costs their first season's salary up front. */
 export const signingFee = (f: Franchise, add: string) => salaryOf(f, add);

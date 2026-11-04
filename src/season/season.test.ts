@@ -169,13 +169,13 @@ describe('share links', () => {
     expect(decodeShare(encodeShare({ ...ten, dex: team.dex.slice(0, 4) }))).toBeNull();
     const url = 'https://pokejam.xyz/#s=x';
     const { grade, ovr } = teamGrade(team.dex.map((d) => monByDex(d)));
-    expect(shareText(ten, url)).toBe(`My PokeJam draft: Pallet Town, grade ${grade}, ${ovr} OVR ${url}`);
+    expect(shareText(ten, url)).toBe(`My PokeBBall draft: Pallet Town, grade ${grade}, ${ovr} OVR ${url}`);
   });
 
   it('share text has the record, the shared grade and the link', () => {
     const url = 'https://pokejam.xyz/#s=abc';
     const g = teamGrade(team.dex.map((d) => monByDex(d))).grade;
-    expect(shareText(team, url)).toBe(`My PokeJam team went 12-6, grade ${g} ${url}`);
+    expect(shareText(team, url)).toBe(`My PokeBBall team went 12-6, grade ${g} ${url}`);
   });
 
   it('strips markup and control characters from names', () => {

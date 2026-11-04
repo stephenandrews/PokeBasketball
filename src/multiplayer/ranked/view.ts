@@ -186,7 +186,7 @@ export function signInPanelHtml(phantom: PhantomAction, o: { busy?: boolean; err
       ${discordBtn}${phantomBtn}
     </div>
     ${phantomNote ? `<p class="note center">${esc(phantomNote)}</p>` : ''}
-    ${phantom.kind === 'deeplink' ? `<p class="note center">Approve in the Phantom app, then come back. Stuck? <a data-a="phantom-browse" href="${esc(phantom.browseHref)}">Open PokeJam in Phantom</a></p>` : ''}
+    ${phantom.kind === 'deeplink' ? `<p class="note center">Approve in the Phantom app, then come back. Stuck? <a data-a="phantom-browse" href="${esc(phantom.browseHref)}">Open PokeBBall in Phantom</a></p>` : ''}
     <p class="note center">${how}</p>
     ${o.error ? `<p class="note center rk-error" role="alert">${esc(o.error)}</p>` : ''}
   </div>`;

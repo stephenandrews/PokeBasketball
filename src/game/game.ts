@@ -3,7 +3,7 @@ import { think } from './ai';
 import {
   BALL_R, COURT_L, COURT_W, DIFFICULTIES, ENGINE_VERSION, GRAVITY, HOOP_Y, RIM_R, RIM_Z,
   backDir, clamp, dist, emptyIntent, hoopX, isThree, lerp, quarterClock, seededRng,
-  type Ball, type GameConfig, type GameEvent, type Grade, type Intent, type Marker, type Player, type Rng, type TeamDef, type TeamId,
+  type Ball, type GameConfig, type GameEvent, type Grade, type Intent, type Marker, type PlayCall, type Player, type Rng, type TeamDef, type TeamId,
 } from './types';
 import { PRACTICE_STAGES, stageX, type PracticeDrill, type PracticeStage } from './practice';
 
@@ -154,6 +154,9 @@ export class Game {
   viewTeam: TeamId = 0;
   /** Training markers painted on the floor (tutorial drills). Display only, never the sim. */
   markers: Marker[] = [];
+  /** The set play the user called (team 0 offense, captain on the floor), until it runs out or the ball turns over. */
+  play: PlayCall | null = null;
+  private playT = 0;
   /** The seed this game was started from (cfg.seed, or a random one). */
   readonly seed: number;
   /** The simulation rules this game runs on; results and snapshots carry it so replays use the same engine. */
@@ -572,7 +575,22 @@ export class Game {
     const changed = t !== this.offense;
     this.offense = t;
     this.shotClock = clock;
-    if (changed) this.updateUser(true);
+    if (changed) {
+      this.play = null; // a set play dies with the possession
+      this.updateUser(true);
+    }
+  }
+
+  /** Whether the user's captain is on the floor (plays can only be called with the captain out there). */
+  captainOnFloor(team: TeamId = 0): boolean {
+    return this.teamPlayers(team).some((p) => p.mon.capt);
+  }
+
+  /** Calls (or cancels) a set play for the user's team; it runs for a while or until the ball turns over. */
+  callPlay(k: PlayCall | null) {
+    if (k && (!this.teams[0].human || !this.captainOnFloor(0))) return;
+    this.play = this.play === k ? null : k;
+    this.playT = this.play ? 12 : 0;
   }
 
   private giveBall(p: Player, silent = false) {
@@ -652,6 +670,7 @@ export class Game {
   update(dt: number) {
     if (this.paused || this.phase === 'final') return;
     this.time += dt;
+    if (this.play && (this.playT -= dt) <= 0) this.play = null;
     this.shake = Math.max(0, this.shake - dt * 2.5);
     for (const i of [0, 1]) {
       this.rimShake[i] = Math.max(0, this.rimShake[i] - dt * 3);
@@ -1266,9 +1285,10 @@ export class Game {
     }
   }
 
-  /** Injury chance grows as a player tires: up to 3x when fully gassed. */
+  /** Injury chance grows as a player tires (up to 3x when gassed) and with every past injury (franchise). */
   private maybeInjure(p: Player, base: number) {
-    if (!this.cfg.injuries || p.hurt || this.rng() >= base * (1 + (1 - p.energy) * 2)) return;
+    const frail = 1 + Math.min(1, (p.mon.frail ?? 0) * 0.25);
+    if (!this.cfg.injuries || p.hurt || this.rng() >= base * frail * (1 + (1 - p.energy) * 2)) return;
     const r = this.rng();
     p.hurt = r < 0.6 ? 1 : r < 0.9 ? 2 : 3;
     p.energy = Math.min(p.energy, 0.15);

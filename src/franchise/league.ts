@@ -53,6 +53,17 @@ export interface FPlayer {
   ovrStart?: number;
   /** Weeks left on the injury list. */
   injury?: number;
+  /** Weeks of rust after coming back from an injury: every rating dips until it wears off. */
+  rust?: number;
+  /** Career injuries: each one makes the next a little more likely. */
+  hurts?: number;
+  /** Full seasons in the league. Veterans start to retire after their fourth. */
+  seasons?: number;
+  /** Contract: $M per season and seasons left on it. Missing in old saves; filled on load. */
+  salary?: number;
+  years?: number;
+  /** Season this player retired after. Retired players stay in the record books but leave the league. */
+  retiredAt?: number;
 }
 
 export interface FTeam {
@@ -76,6 +87,10 @@ export interface FTeam {
   pf: number;
   pa: number;
   streak: number; // +n wins in a row, -n losses
+  /** Cash on hand in $M. Every team gets the league grant at each season tipoff, minus payroll. */
+  cash?: number;
+  /** Team captain (uid): +1 to everyone's ratings in games, and plays can be called while they're on the floor. */
+  captain?: string;
 }
 
 export interface FGame {
@@ -140,6 +155,20 @@ export interface Franchise {
   introShown?: number;
   /** The user's pick in the last rookie draft, for the new-season preview. */
   draftedRookie?: string;
+  /** The owner's signature, drawn when the franchise was founded (a small data-URL image). */
+  signature?: string;
+  /** This week's trade offer from a rival GM, if any. Cleared when the week advances. */
+  offers?: TradeOffer[];
+}
+
+/** A rival GM's offer: their players (`give`) and cash for yours (`get`). */
+export interface TradeOffer {
+  team: number;
+  give: string[];
+  get: string[];
+  /** $M they add on top. */
+  cash: number;
+  week: number;
 }
 
 /**
@@ -165,9 +194,86 @@ export interface Award {
 
 const emptyStats = (): SeasonStats => ({ gp: 0, pts: 0, fgm: 0, fga: 0, tpm: 0, tpa: 0, reb: 0, ast: 0, stl: 0, blk: 0, dnk: 0, sec: 0, gs: 0 });
 
+// ---------- money, contracts & careers ----------
+
+/** $M every team is granted at each season tipoff, after payroll comes out. */
+export const SEASON_BUDGET = 10;
+/** What one $M is worth on the trade market, in trade-value points. */
+const CASH_VALUE = 12;
+/** Ratings lost per week of post-injury rust (capped at −6). */
+const RUST_PENALTY = 2;
+
+export const fmtM = (v: number) => `$${(Math.round(v * 10) / 10).toFixed(1)}M`;
+
+/** Market salary in $M per season for a player of this rating. A strong ten-man roster runs ~$7-8M. */
+export const marketSalary = (ovr: number) => Math.max(0.2, Math.round(Math.max(0, ovr - 55) * 0.25) / 10);
+
+export const salaryOf = (f: Franchise, uid: string): number => f.players[uid].salary ?? marketSalary(monOf(f, uid).ovr);
+
+export const payrollOf = (f: Franchise, t: FTeam): number =>
+  Math.round(t.roster.reduce((a, u) => a + salaryOf(f, u), 0) * 10) / 10;
+
+export const cashOf = (t: FTeam): number => Math.round((t.cash ?? 0) * 10) / 10;
+
+/**
+ * Fills the economy into saves from before it existed: a season budget per team and a market
+ * contract (1-3 years, seeded by uid so a reload gives the same deal) for every player.
+ */
+function ensureEconomy(f: Franchise) {
+  for (const t of f.teams) t.cash ??= SEASON_BUDGET;
+  for (const p of Object.values(f.players)) {
+    p.seasons ??= 0;
+    if (p.salary === undefined) p.salary = marketSalary(withBonus(p.dex, p.bonus).ovr);
+    p.years ??= 1 + (hashOf(p.uid) % 3);
+  }
+}
+
+/** Chance a veteran hangs it up after this many full seasons. */
+export const retirementChance = (seasons: number) => (seasons >= 4 ? Math.min(0.75, (seasons - 3) * 0.25) : 0);
+
+/**
+ * End-of-season retirements: veterans leave rosters (at most two per team, never below eight players)
+ * and free agency. Retired players stay in the record books.
+ */
+export function runRetirements(f: Franchise, rng: () => number = Math.random) {
+  const retire = (p: FPlayer, teamName?: string) => {
+    p.retiredAt = f.season;
+    const m = withBonus(p.dex, p.bonus);
+    f.news.unshift(`${m.name} retires after ${p.seasons} season${p.seasons === 1 ? '' : 's'}${teamName ? ` with ${teamName}` : ''}. Happy trails!`);
+  };
+  for (const t of f.teams) {
+    let gone = 0;
+    for (const u of [...t.roster]) {
+      const p = f.players[u];
+      if (gone >= 2 || t.roster.length <= 8) break;
+      if (rng() >= retirementChance(p.seasons ?? 0)) continue;
+      t.roster = t.roster.filter((x) => x !== u);
+      if (t.lineup) t.lineup = t.lineup.filter((x) => x !== u);
+      if (t.captain === u) delete t.captain;
+      retire(p, t.name);
+      gone++;
+    }
+  }
+  // Free agents fade away more quietly (half the news, same odds).
+  f.freeAgents = f.freeAgents.filter((u) => {
+    const p = f.players[u];
+    if (rng() >= retirementChance(p.seasons ?? 0)) return true;
+    p.retiredAt = f.season;
+    return false;
+  });
+  f.news = f.news.slice(0, 8);
+}
+
 export const monOf = (f: Franchise, uid: string): Mon => {
   const p = f.players[uid];
-  return withBonus(p.dex, p.bonus);
+  const rust = Math.min(6, (p.rust ?? 0) * RUST_PENALTY);
+  const m = rust
+    ? withBonus(p.dex, Object.fromEntries(
+        (Object.keys(RATING_LABELS) as (keyof Ratings)[]).map((k) => [k, (p.bonus[k] ?? 0) - rust]),
+      ) as Partial<Ratings>)
+    : withBonus(p.dex, p.bonus);
+  if (p.hurts) m.frail = p.hurts;
+  return m;
 };
 
 /** Uids of a team's starting five and bench, in the order the coach would use them. */
@@ -258,7 +364,7 @@ export function createFranchise(
     players[uid] = { uid, dex: m.dex, level: 1, xp: 0, bonus: {}, stats: emptyStats(), ovrStart: m.ovr };
     return uid;
   };
-  return {
+  const f: Franchise = {
     version: 1,
     season: 1,
     week: 1,
@@ -272,6 +378,8 @@ export function createFranchise(
     news: [],
     history: [],
   };
+  ensureEconomy(f);
+  return f;
 }
 
 export function saveFranchise(f: Franchise) {
@@ -297,7 +405,7 @@ function retireLegacy(f: Franchise) {
       t.roster = t.roster.map((x) => (x === u ? add : x));
       if (t.lineup) t.lineup = t.lineup.map((x) => (x === u ? add : x));
       f.freeAgents.splice(f.freeAgents.indexOf(add), 1);
-      f.news.unshift(`${old.name} left the league (retired from Poké Jam). ${t.name} signed ${monOf(f, add).name}.`);
+      f.news.unshift(`${old.name} left the league (retired from PokeBBall). ${t.name} signed ${monOf(f, add).name}.`);
     }
   }
   f.news = f.news.slice(0, 8);
@@ -329,6 +437,7 @@ export function loadFranchise(): Franchise | null {
     const f = JSON.parse(raw) as Franchise;
     if (f?.version !== 1 || !cleanTeams(f.teams) || typeof f.players !== 'object' || !Array.isArray(f.games)) return null;
     retireLegacy(f);
+    ensureEconomy(f);
     return f;
   } catch {
     return null;
@@ -399,11 +508,26 @@ export function teamDef(f: Franchise, id: number, human: boolean): { def: TeamDe
   const { starters, bench } = lineupOf(f, t);
   const toMon = (u: string) => {
     const m = monOf(f, u);
+    if (u === t.captain) m.capt = true;
     uidOf.set(m, u);
     return m;
   };
   const roster = starters.map(toMon);
-  return { def: { name: t.name, abbr: t.abbr, color: t.color, color2: t.color2, roster, bench: bench.map(toMon), human, boost: t.boost, coach: t.leader }, uidOf };
+  // A captain rallies the whole team: +1 to every rating on top of any gym boost.
+  const boost = (t.boost ?? 0) + (t.captain && t.roster.includes(t.captain) ? 1 : 0);
+  return { def: { name: t.name, abbr: t.abbr, color: t.color, color2: t.color2, roster, bench: bench.map(toMon), human, boost, coach: t.leader }, uidOf };
+}
+
+/** Names the user's team captain (or removes them with undefined). */
+export function setCaptain(f: Franchise, uid?: string) {
+  const me = f.teams[0];
+  if (uid && !me.roster.includes(uid)) return;
+  if (!uid || me.captain === uid) delete me.captain;
+  else {
+    me.captain = uid;
+    f.news.unshift(`${monOf(f, uid).name} named ${me.name} team captain.`);
+    f.news = f.news.slice(0, 8);
+  }
 }
 
 /** The home team's floor. */
@@ -496,6 +620,10 @@ export function recordGame(f: Franchise, fg: FGame, g: Game, sides: [number, num
     if (gp.hurt) {
       // +1 because the week this game belongs to is about to tick off in advance().
       p.injury = Math.max(p.injury ?? 0, gp.hurt + 1);
+      // Injuries leave a mark: rust (a ratings dip) for twice the weeks missed, and a career
+      // injury count that makes the next one a little more likely.
+      p.rust = Math.max(p.rust ?? 0, gp.hurt * 2);
+      p.hurts = (p.hurts ?? 0) + 1;
       f.news.unshift(`${f.teams[sides[gp.team]].name}'s ${gp.mon.name} is out ${gp.hurt} week${gp.hurt > 1 ? 's' : ''}.`);
     }
     // `?? 0` covers stats saved before a field existed.
@@ -537,10 +665,15 @@ export function recordGame(f: Franchise, fg: FGame, g: Game, sides: [number, num
 /** Moves the league forward once every game this week is final: next week, playoffs, or a crowned champion. */
 export function advance(f: Franchise) {
   if (weekGames(f).some((g) => !g.score)) return;
-  // A week passes: everyone on the injury list gets a week closer to healthy.
-  for (const p of Object.values(f.players)) if (p.injury) p.injury--;
+  // A week passes: the injured get a week closer to healthy, and the healed shake off rust.
+  for (const p of Object.values(f.players)) {
+    if (p.injury) p.injury--;
+    else if (p.rust) p.rust--;
+  }
+  f.offers = [];
   if (f.phase === 'season' && f.week < seasonWeeks(f)) {
     f.week++;
+    maybeAiOffer(f);
   } else if (f.phase === 'season') {
     const seeds = standings(f).slice(0, 4).map((t) => t.id);
     f.phase = 'playoffs';
@@ -564,6 +697,7 @@ export function advance(f: Franchise) {
     const champ = f.teams[f.champion];
     f.history.push({ season: f.season, champion: champ.name, mvp: f.mvp ? monByDex(f.players[f.mvp].dex).name : '—' });
     f.news.unshift(`${champ.name} win the Season ${f.season} championship!`);
+    runRetirements(f);
   }
   f.news = f.news.slice(0, 8);
 }
@@ -592,7 +726,7 @@ function computeAwards(f: Franchise): Award[] {
   return out;
 }
 
-/** Same rosters and levels, fresh schedule and records. */
+/** Same rosters and levels, fresh schedule and records; everyone ages a season and the books get settled. */
 export function nextSeason(f: Franchise) {
   f.season++;
   f.week = 1;
@@ -600,15 +734,35 @@ export function nextSeason(f: Franchise) {
   f.champion = undefined;
   f.mvp = undefined;
   f.signedWeek = 0;
+  f.offers = [];
   f.games = schedule(f.teams.length, !f.weeks);
   for (const t of f.teams) Object.assign(t, { w: 0, l: 0, pf: 0, pa: 0, streak: 0 });
   for (const [uid, p] of Object.entries(f.players)) {
     p.stats = emptyStats();
     p.ovrStart = monOf(f, uid).ovr;
     p.injury = 0;
+    p.rust = 0;
+    if (!p.retiredAt) p.seasons = (p.seasons ?? 0) + 1;
   }
   f.awards = undefined;
   f.news = [`Season ${f.season} tips off.`];
+  // The books: contracts tick down (expired ones re-sign at today's market rate), then every team
+  // banks the league grant minus payroll. Cash never goes below zero: a thin wallet just stays thin.
+  for (const t of f.teams) {
+    for (const u of t.roster) {
+      const p = f.players[u];
+      p.years = (p.years ?? 1) - 1;
+      if (p.years <= 0) {
+        p.salary = marketSalary(monOf(f, u).ovr);
+        p.years = 2;
+        if (t.human) f.news.push(`${monOf(f, u).name} re-signed for ${fmtM(p.salary)} a season (2 years).`);
+      }
+    }
+    if (t.captain && !t.roster.includes(t.captain)) delete t.captain;
+    t.cash = Math.max(0, Math.round(((t.cash ?? 0) + SEASON_BUDGET - payrollOf(f, t)) * 10) / 10);
+  }
+  const me = f.teams[0];
+  f.news.push(`League grant: every team banks ${fmtM(SEASON_BUDGET)}. Your payroll is ${fmtM(payrollOf(f, me))}; you have ${fmtM(cashOf(me))}.`);
 }
 
 export const canSign = (f: Franchise) => f.phase !== 'done' && f.signedWeek < f.week;
@@ -643,12 +797,13 @@ export interface TradeVerdict {
   reason: string;
 }
 
-/** The other GM's answer to `give` (yours) for `get` (theirs). */
-export function judgeTrade(f: Franchise, teamId: number, give: string[], get: string[]): TradeVerdict {
+/** The other GM's answer to `give` (yours, plus `cash` $M) for `get` (theirs). */
+export function judgeTrade(f: Franchise, teamId: number, give: string[], get: string[], cash = 0): TradeVerdict {
   if (!canTrade(f)) return { ok: false, lean: 0, reason: 'The trade deadline has passed. Trading reopens in the offseason.' };
   if (!give.length || give.length !== get.length) return { ok: false, lean: 0, reason: 'Pick the same number of players on each side (1 or 2).' };
+  if (cash > cashOf(f.teams[0])) return { ok: false, lean: 0, reason: "You don't have that much cash." };
   const them = f.teams[teamId];
-  const incoming = give.reduce((a, u) => a + tradeValue(f, u, them), 0);
+  const incoming = give.reduce((a, u) => a + tradeValue(f, u, them), 0) + cash * CASH_VALUE;
   const outgoing = get.reduce((a, u) => a + tradeValue(f, u, them), 0);
   // They want to come out a little ahead.
   const ratio = incoming / Math.max(1, outgoing * 1.05);
@@ -660,30 +815,90 @@ export function judgeTrade(f: Franchise, teamId: number, give: string[], get: st
   return { ok: false, lean, reason: `${who}: "Not even close."` };
 }
 
-export function makeTrade(f: Franchise, teamId: number, give: string[], get: string[]): boolean {
-  if (!judgeTrade(f, teamId, give, get).ok) return false;
+/** Swaps the players (and any cash, $M from the user to `teamId`) with no questions asked. */
+function swapPlayers(f: Franchise, teamId: number, give: string[], get: string[], cash: number) {
   const me = f.teams[0];
   const them = f.teams[teamId];
   me.roster = me.roster.map((u) => (give.includes(u) ? get[give.indexOf(u)] : u));
   them.roster = them.roster.map((u) => (get.includes(u) ? give[get.indexOf(u)] : u));
   if (me.lineup) me.lineup = me.lineup.map((u) => (give.includes(u) ? get[give.indexOf(u)] : u));
   delete them.lineup;
+  if (me.captain && give.includes(me.captain)) delete me.captain;
+  if (them.captain && get.includes(them.captain)) delete them.captain;
+  me.cash = Math.max(0, Math.round((cashOf(me) - cash) * 10) / 10);
+  them.cash = Math.max(0, Math.round((cashOf(them) + cash) * 10) / 10);
+}
+
+export function makeTrade(f: Franchise, teamId: number, give: string[], get: string[], cash = 0): boolean {
+  if (!judgeTrade(f, teamId, give, get, cash).ok) return false;
+  const them = f.teams[teamId];
+  swapPlayers(f, teamId, give, get, cash);
   const names = (us: string[]) => us.map((u) => monOf(f, u).name).join(' and ');
-  f.news.unshift(`Trade! ${me.name} send ${names(give)} to ${them.name} for ${names(get)}.`);
+  f.news.unshift(`Trade! ${f.teams[0].name} send ${names(give)}${cash ? ` and ${fmtM(cash)}` : ''} to ${them.name} for ${names(get)}.`);
   f.news = f.news.slice(0, 8);
   return true;
 }
+
+/**
+ * Once a week during the season a rival GM may call with an offer: one of their players (plus cash
+ * if they're short on value) for one of your three most tempting players. Offers that can't be made
+ * at least fair for you never go out.
+ */
+export function maybeAiOffer(f: Franchise, rng: () => number = Math.random) {
+  if (!canTrade(f) || f.phase !== 'season' || rng() >= 0.4) return;
+  const me = f.teams[0];
+  const them = f.teams[1 + Math.floor(rng() * (f.teams.length - 1))];
+  if (!them || them.human) return;
+  const targets = [...me.roster].sort((a, b) => tradeValue(f, b, them) - tradeValue(f, a, them)).slice(0, 3);
+  const want = targets[Math.floor(rng() * targets.length)];
+  if (!want) return;
+  const wantVal = tradeValue(f, want, them);
+  // Their sweetener: the player of theirs closest to that value, topped up with cash.
+  const give = [...them.roster].sort((a, b) =>
+    Math.abs(tradeValue(f, a, them) - wantVal) - Math.abs(tradeValue(f, b, them) - wantVal))[0];
+  if (!give) return;
+  const gap = wantVal * 1.02 - tradeValue(f, give, them);
+  const cash = Math.min(Math.max(0, Math.ceil(gap / CASH_VALUE)), Math.floor(cashOf(them)));
+  if (tradeValue(f, give, them) + cash * CASH_VALUE < wantVal) return; // they can't afford a fair offer
+  f.offers = [{ team: them.id, give: [give], get: [want], cash, week: f.week }];
+  f.news.unshift(`${them.leader ?? them.name} called with a trade offer for ${monOf(f, want).name}.`);
+  f.news = f.news.slice(0, 8);
+}
+
+/** Takes the rival GM's standing offer. Their offer, their terms: no judging. */
+export function acceptOffer(f: Franchise): boolean {
+  const o = f.offers?.[0];
+  if (!o || !canTrade(f)) return false;
+  const them = f.teams[o.team];
+  swapPlayers(f, o.team, o.get, o.give, -o.cash);
+  const names = (us: string[]) => us.map((u) => monOf(f, u).name).join(' and ');
+  f.news.unshift(`Trade! ${them.name} send ${names(o.give)}${o.cash ? ` and ${fmtM(o.cash)}` : ''} to ${f.teams[0].name} for ${names(o.get)}.`);
+  f.news = f.news.slice(0, 8);
+  f.offers = [];
+  return true;
+}
+
+export const declineOffer = (f: Franchise) => { f.offers = []; };
+
+/** Signing a free agent costs their first season's salary up front. */
+export const signingFee = (f: Franchise, add: string) => salaryOf(f, add);
 
 export function sign(f: Franchise, release: string, add: string) {
   const team = f.teams[0];
   const i = team.roster.indexOf(release);
   const j = f.freeAgents.indexOf(add);
-  if (i < 0 || j < 0 || !canSign(f)) return;
+  const fee = signingFee(f, add);
+  if (i < 0 || j < 0 || !canSign(f) || fee > cashOf(team)) return;
   team.roster[i] = add;
   if (team.lineup) team.lineup = team.lineup.map((u) => (u === release ? add : u));
+  if (team.captain === release) delete team.captain;
   f.freeAgents[j] = release;
   f.signedWeek = f.week;
-  f.news.unshift(`${team.name} signed ${monOf(f, add).name} and released ${monOf(f, release).name}.`);
+  team.cash = Math.max(0, Math.round((cashOf(team) - fee) * 10) / 10);
+  const p = f.players[add];
+  p.salary = fee;
+  p.years = Math.max(p.years ?? 0, 1);
+  f.news.unshift(`${team.name} signed ${monOf(f, add).name} (${fmtM(fee)}) and released ${monOf(f, release).name}.`);
   f.news = f.news.slice(0, 8);
 }
 
@@ -849,6 +1064,11 @@ export function rookiePick(f: Franchise, uid?: string): string | null {
   t.roster.push(pick);
   if (t.lineup) t.lineup.push(pick);
   f.freeAgents.splice(f.freeAgents.indexOf(pick), 1);
+  // A rookie contract: three years at today's market rate for their raw rating.
+  const p = f.players[pick];
+  p.salary = marketSalary(monOf(f, pick).ovr);
+  p.years = 3;
+  p.seasons = 0;
   return pick;
 }
 
@@ -862,7 +1082,8 @@ export function finishRookieDraft(f: Franchise, release: string) {
     f.freeAgents.push(uid);
   };
   const me = f.teams[0];
-  if (me.roster.includes(release)) cut(me, release);
+  // Retirements can leave a team short: nobody cuts below a ten-player roster.
+  if (me.roster.includes(release) && me.roster.length > 10) cut(me, release);
   for (const t of f.teams) {
     if (t.human || t.roster.length <= 10) continue;
     cut(t, t.roster.reduce((a, b) => (tradeValue(f, b, t) < tradeValue(f, a, t) ? b : a)));
@@ -874,4 +1095,33 @@ export function finishRookieDraft(f: Franchise, release: string) {
   if (mine &&me.roster.includes(mine)) f.news.push(`${me.name} drafted ${monOf(f, mine).name} in the rookie draft.`);
   const top = r.picks[0];
   f.news.push(`${f.teams[r.order[0]].name} took ${monOf(f, top).name} first overall.`);
+}
+
+/** XP a private-court practice session is worth to everyone who took part. */
+export const PRACTICE_XP = 8;
+
+/** Grants practice XP to the whole roster, with the usual level-ups and evolutions. */
+export function grantPracticeXp(f: Franchise, uids: string[] = f.teams[0].roster): Progress[] {
+  const progress: Progress[] = [];
+  for (const uid of uids) {
+    const p = f.players[uid];
+    if (!p) continue;
+    p.xp += PRACTICE_XP;
+    while (p.xp >= xpToNext(p.level)) {
+      p.xp -= xpToNext(p.level);
+      p.level++;
+      const name = monByDex(p.dex).name;
+      const entry: Progress = { uid, team: 0, name, level: p.level, gains: levelUp(p) };
+      const evo = EVOLUTIONS[p.dex];
+      if (evo && p.level >= evo.level) {
+        entry.evolvedFrom = p.dex;
+        p.dex = evo.to[Math.floor(Math.random() * evo.to.length)];
+        entry.evolvedTo = p.dex;
+        f.news.unshift(`${f.teams[0].name}'s ${name} evolved into ${monByDex(p.dex).name}!`);
+      }
+      progress.push(entry);
+    }
+  }
+  f.news = f.news.slice(0, 8);
+  return progress;
 }

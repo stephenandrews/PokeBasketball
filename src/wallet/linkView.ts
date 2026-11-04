@@ -27,7 +27,7 @@ function inner(s: LinkSheet): string {
         <div class="ph-btns"><a class="btn primary big" data-a="link-sign" href="${esc(s.href)}">Link Phantom</a>
         <button class="btn ghost" type="button" data-a="link-cancel">Cancel</button></div>`;
     case 'done':
-      return `<p class="ph-msg">Go back to the PokeJam app. The wallet links to the account you signed in with.</p>
+      return `<p class="ph-msg">Go back to the PokeBBall app. The wallet links to the account you signed in with.</p>
         <p class="note center ph-code">Check code <b>${esc(s.code)}</b></p>
         <button class="btn ghost" type="button" data-a="link-close">Close</button>`;
     case 'failed':

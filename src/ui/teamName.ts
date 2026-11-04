@@ -52,7 +52,7 @@ export function inlineRename(host: HTMLElement, getName: () => string, onSave: (
  * a clear note that it will be replaced. The 3-character scoreboard abbreviation follows the name until edited.
  * Resolves to the confirmed name and abbreviation, or null when cancelled.
  */
-export function confirmFranchiseName(opts: { name: string; abbr?: string; replacing: boolean }): Promise<{ name: string; abbr: string } | null> {
+export function confirmFranchiseName(opts: { name: string; abbr?: string; replacing: boolean }): Promise<{ name: string; abbr: string; signature?: string } | null> {
   return new Promise((resolve) => {
     const el = document.createElement('div');
     el.className = 'fc-dialog';
@@ -69,6 +69,11 @@ export function confirmFranchiseName(opts: { name: string; abbr?: string; replac
           </label>
         </div>
         <p class="fc-hint" hidden>Pick 3 letters</p>
+        <div class="fc-sig">
+          <span class="fc-sig-lbl">Owner's signature <small>sign the founding papers (optional)</small></span>
+          <canvas class="fc-sig-pad" width="360" height="110" aria-label="Draw your signature"></canvas>
+          <button class="btn small ghost" data-fc="sig-clear" type="button">Clear</button>
+        </div>
         ${opts.replacing ? '<p class="fc-warn"><b>This replaces your saved franchise.</b> Its season, roster and progress will be erased. This can\'t be undone.</p>' : ''}
         <div class="actions center">
           <button class="btn primary big" data-fc="yes">Yes, start franchise</button>
@@ -79,7 +84,49 @@ export function confirmFranchiseName(opts: { name: string; abbr?: string; replac
     const ab = el.querySelector<HTMLInputElement>('#fc-abbr')!;
     // Follows the name (the old derived abbreviation) until the player types their own.
     let abEdited = !!opts.abbr && cleanAbbr(opts.abbr) !== abbr(opts.name);
-    const result = () => ({ name: cleanName(input.value), abbr: cleanAbbr(ab.value) });
+
+    // The signature pad: plain pointer drawing on a small canvas, kept as a data URL.
+    const pad = el.querySelector<HTMLCanvasElement>('.fc-sig-pad')!;
+    const ctx = pad.getContext('2d');
+    let signed = false;
+    if (ctx) {
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = '#1b2a6b';
+      let down = false;
+      const at = (e: PointerEvent) => {
+        const r = pad.getBoundingClientRect();
+        return [((e.clientX - r.left) / r.width) * pad.width, ((e.clientY - r.top) / r.height) * pad.height] as const;
+      };
+      pad.addEventListener('pointerdown', (e) => {
+        down = true;
+        signed = true;
+        pad.setPointerCapture(e.pointerId);
+        const [x, y] = at(e);
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        e.preventDefault();
+      });
+      pad.addEventListener('pointermove', (e) => {
+        if (!down) return;
+        const [x, y] = at(e);
+        ctx.lineTo(x, y);
+        ctx.stroke();
+        e.preventDefault();
+      });
+      for (const ev of ['pointerup', 'pointercancel'] as const) pad.addEventListener(ev, () => { down = false; });
+    }
+    const clearSig = () => {
+      signed = false;
+      ctx?.clearRect(0, 0, pad.width, pad.height);
+    };
+    const signature = (): string | undefined => {
+      if (!signed) return undefined;
+      try { return pad.toDataURL('image/png'); } catch { return undefined; }
+    };
+
+    const result = () => ({ name: cleanName(input.value), abbr: cleanAbbr(ab.value), signature: signature() });
     const hint = el.querySelector<HTMLElement>('.fc-hint')!;
     const big = el.querySelector<HTMLElement>('.fc-big')!;
     const yes = el.querySelector<HTMLButtonElement>('[data-fc="yes"]')!;
@@ -100,7 +147,7 @@ export function confirmFranchiseName(opts: { name: string; abbr?: string; replac
       showNameError(input);
       yes.disabled = !cleanName(input.value) || !ok || bad;
     };
-    const done = (v: { name: string; abbr: string } | null) => {
+    const done = (v: { name: string; abbr: string; signature?: string } | null) => {
       el.remove();
       window.removeEventListener('keydown', onKey, true);
       resolve(v);
@@ -120,7 +167,8 @@ export function confirmFranchiseName(opts: { name: string; abbr?: string; replac
     ab.addEventListener('blur', () => { if (!ab.value) { abEdited = false; ab.value = abbr(cleanName(input.value)); check(); } });
     el.addEventListener('click', (e) => {
       const a = (e.target as HTMLElement).closest<HTMLElement>('[data-fc]')?.dataset.fc;
-      if (a === 'yes' && !yes.disabled) done(result());
+      if (a === 'sig-clear') clearSig();
+      else if (a === 'yes' && !yes.disabled) done(result());
       else if (a === 'cancel' || e.target === el) done(null);
     });
     window.addEventListener('keydown', onKey, true);

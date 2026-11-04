@@ -17,8 +17,8 @@ describe('names and ladder score', () => {
     expect(rankName(7)).toBe('Gold 2');
     expect(rankName(15)).toBe('Prism 3');
     expect(rankName(18)).toBe('Eclipse 3');
-    expect(rankName(21)).toBe('PokeJam Master 3');
-    expect(rankName(23)).toBe('PokeJam Master 1');
+    expect(rankName(21)).toBe('PokeBBall Master 3');
+    expect(rankName(23)).toBe('PokeBBall Master 1');
     expect(rankName(24)).toBe('Zenith');
     expect(tierName(14)).toBe('Diamond');
     expect(rankLabel(7, 40)).toBe('Gold 2 - 40 pts');
@@ -321,8 +321,8 @@ describe('leavers', () => {
 describe('rank list copy', () => {
   it('lists all 9 tiers in order, Zenith last', async () => {
     const { ALL_TIER_NAMES, TIER_LIST_TEXT, TIER_RANGE_TEXT } = await import('./rank');
-    expect(ALL_TIER_NAMES).toEqual(['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Prism', 'Eclipse', 'PokeJam Master', 'Zenith']);
-    expect(TIER_LIST_TEXT).toBe('Bronze, Silver, Gold, Platinum, Diamond, Prism, Eclipse, PokeJam Master, then Zenith');
+    expect(ALL_TIER_NAMES).toEqual(['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Prism', 'Eclipse', 'PokeBBall Master', 'Zenith']);
+    expect(TIER_LIST_TEXT).toBe('Bronze, Silver, Gold, Platinum, Diamond, Prism, Eclipse, PokeBBall Master, then Zenith');
     expect(TIER_RANGE_TEXT).toBe('Bronze to Zenith');
   });
 });

@@ -2521,3 +2521,73 @@ body:has(.pause-btn) .music-btn:not(.docked) {
   .ch-list li { padding: 8px; }
   .ch-bonus, .ch-odds { font-size: 0.88rem; }
 }
+
+/* ---------- PokeBBall update: economy, captains, plays, offers, signature ---------- */
+
+/* Hub header: cash on hand and the owner's signature from founding day. */
+.hub-head .cash { color: #ffd84d; }
+.hub-head small { opacity: 0.75; }
+.owner-sig {
+  height: 44px; max-width: 150px; margin-left: auto; align-self: center;
+  background: #f4f1e8; border-radius: 6px; padding: 2px 8px; object-fit: contain;
+  transform: rotate(-2deg); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+/* Roster extras: the captain's C, post-injury rust. */
+.capt {
+  display: inline-block; min-width: 1.1em; text-align: center; margin-right: 2px;
+  background: #ffd84d; color: #1a1a1a; border-radius: 3px; font-size: 0.72em; padding: 0 2px;
+}
+.rusty { color: #e8a33d; }
+
+/* A rival GM's trade offer. */
+.offer { border: 1px solid var(--tc); }
+.offer-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.offer-cols h4 { margin: 0 0 6px; }
+.offer-cols ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.offer-cols li { display: flex; align-items: center; gap: 8px; background: rgba(255, 255, 255, 0.04); border-radius: 8px; padding: 6px 8px; }
+.offer-cols li img { width: 40px; height: 40px; image-rendering: pixelated; }
+.offer-cols li .nm, .offer-cols li span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.offer-cols li small { opacity: 0.75; }
+.offer-cols li > b { margin-left: auto; }
+.offer-cols .cash-line { justify-content: center; color: #ffd84d; }
+@media (max-width: 640px) { .offer-cols { grid-template-columns: 1fr; } }
+
+/* Cash sweetener in the trade sheet. */
+.trade-cash { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
+.trade-cash span { margin-right: auto; }
+.trade-cash small { opacity: 0.7; }
+.trade-cash b { min-width: 4.5em; text-align: center; color: #ffd84d; }
+.trade-sheet .trade-row small { display: block; }
+.trade-sheet .trade-row .types { margin-top: 2px; }
+
+/* Set plays: the in-game bar (keys 1-4, or tap). */
+.plays-bar {
+  position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%);
+  display: flex; gap: 6px; z-index: 6; transition: opacity 0.15s;
+}
+.plays-bar.off { opacity: 0; pointer-events: none; }
+.play-chip {
+  font: 700 0.68rem/1 var(--sport); letter-spacing: 0.05em; text-transform: uppercase;
+  background: rgba(10, 13, 31, 0.78); color: #f2f0e6; border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 999px; padding: 7px 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+}
+.play-chip i {
+  font-style: normal; background: rgba(255, 255, 255, 0.18); border-radius: 4px;
+  min-width: 1.3em; text-align: center; padding: 1px 2px;
+}
+.play-chip.on { background: #ffd84d; color: #1a1a1a; border-color: #ffd84d; }
+.play-chip.on i { background: rgba(0, 0, 0, 0.15); }
+.has-touch .plays-bar { bottom: 128px; }
+
+/* Types on the in-game player card. */
+.pcard .ptypes { margin: 2px 0 4px; }
+.pcard .ptypes i { color: #111; }
+
+/* The founding-papers signature pad. */
+.fc-sig { display: grid; gap: 6px; justify-items: start; margin: 10px 0; }
+.fc-sig-lbl small { opacity: 0.7; display: block; }
+.fc-sig-pad {
+  width: min(360px, 100%); height: 110px; touch-action: none; cursor: crosshair;
+  background: #f4f1e8; border: 1px dashed #8a93a6; border-radius: 8px;
+}

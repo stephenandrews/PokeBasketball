@@ -39,7 +39,7 @@ describe('tutorial prompt strip layout', () => {
   });
   it('puts the Telegram link left of the X link on the menu', () => {
     expect(rule('.x-link.tg-link')).toMatch(/right: calc\(max\(10px, env\(safe-area-inset-right, 0px\)\) \+ 40px \+ 10px \+ 40px \+ 10px\)/);
-    expect(menu).toMatch(/class="x-link tg-link" href="https:\/\/t\.me\/PokeJamSol" target="_blank" rel="noopener noreferrer" aria-label="PokeJam on Telegram" title="PokeJam on Telegram"/);
+    expect(menu).toMatch(/class="x-link tg-link" href="https:\/\/t\.me\/PokeJamSol" target="_blank" rel="noopener noreferrer" aria-label="PokeBBall on Telegram" title="PokeBBall on Telegram"/);
   });
   it('puts the pump.fun link left of the Telegram link on the menu', () => {
     expect(rule('.x-link.pf-link')).toMatch(/right: calc\(max\(10px, env\(safe-area-inset-right, 0px\)\) \+ 40px \+ 10px \+ 40px \+ 10px \+ 40px \+ 10px\)/);

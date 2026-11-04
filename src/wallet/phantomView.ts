@@ -13,7 +13,7 @@ export type SheetState =
   | { kind: 'go-back'; app: boolean; code?: string };
 
 const CANCEL = '<button class="btn ghost" type="button" data-a="phantom-cancel">Cancel</button>';
-const codeLine = (code: string) => `<p class="note center ph-code">Check code <b>${esc(code)}</b> — the PokeJam app shows the same one.</p>`;
+const codeLine = (code: string) => `<p class="note center ph-code">Check code <b>${esc(code)}</b> — the PokeBBall app shows the same one.</p>`;
 const CLOSE = '<button class="btn ghost" type="button" data-a="phantom-close">Close</button>';
 
 function inner(s: SheetState): string {
@@ -26,13 +26,13 @@ function inner(s: SheetState): string {
       <div class="ph-btns"><a class="btn primary big" data-a="phantom-sign" href="${esc(s.href)}"${s.newTab ? ' target="_blank" rel="noopener"' : ''}>Sign in Phantom</a>${CANCEL}</div>`;
     case 'wait-safari': return `<p class="ph-msg">Approve in Phantom. It finishes in Safari, then come back here.</p>
       <p class="note center ph-code">Check code <b>${esc(s.code)}</b></p>${CANCEL}`;
-    case 'safari-done': return `<p class="ph-msg">Signed in — go back to the PokeJam app on your home screen.</p>
+    case 'safari-done': return `<p class="ph-msg">Signed in — go back to the PokeBBall app on your home screen.</p>
       <p class="note center ph-code">Check code <b>${esc(s.code)}</b></p>${CLOSE}`;
     case 'working': return `<p class="ph-msg">${esc(s.text)}</p>`;
     case 'failed': return `<p class="ph-msg" data-tone="${s.tone}" role="alert">${esc(s.text)}</p>${s.diag ? `<p class="ph-diag" data-diag>${esc(s.diag)}</p>` : ''}${CLOSE}`;
     case 'go-back': return `<p class="ph-msg">Phantom answered.</p>${s.code ? `<p class="note center ph-code">Check code <b>${esc(s.code)}</b>. It should match the page you started from.</p>` : ''}<p class="note center">${s.app
-      ? 'Go back to the PokeJam app on your home screen to continue.'
-      : 'Go back to the PokeJam tab you started from to continue.'}</p>${CLOSE}`;
+      ? 'Go back to the PokeBBall app on your home screen to continue.'
+      : 'Go back to the PokeBBall tab you started from to continue.'}</p>${CLOSE}`;
     default: {
       const _never: never = s;
       return _never;

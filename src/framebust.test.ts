@@ -13,8 +13,8 @@ function el(tag: string): El {
   };
 }
 
-const HREF = 'https://pokejam.xyz/';
-const ORIGIN = 'https://pokejam.xyz';
+const HREF = 'https://pokebball.zublo.ai/';
+const ORIGIN = 'https://pokebball.zublo.ai';
 
 function run(top: 'self' | 'cross' | 'same', opts: { redirectThrows?: boolean } = {}) {
   const doc = { documentElement: el('html'), createElement: el };
@@ -67,8 +67,8 @@ describe('framebust guard', () => {
     expect(r.doc.documentElement.style.visibility).toBe('hidden');
     const [msg, link] = r.overlay!.children;
     expect(r.overlay!.style.cssText).toContain('visibility:visible');
-    expect(msg.textContent).toBe('Poké Jam only plays at pokejam.xyz');
+    expect(msg.textContent).toBe('PokeBBall only plays at pokebball.zublo.ai');
     expect(link.tag).toBe('a');
-    expect(link.attrs).toEqual({ href: 'https://pokejam.xyz', target: '_blank', rel: 'noopener' });
+    expect(link.attrs).toEqual({ href: 'https://pokebball.zublo.ai', target: '_blank', rel: 'noopener' });
   });
 });

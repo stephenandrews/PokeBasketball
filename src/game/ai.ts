@@ -193,6 +193,39 @@ function bestPassTarget(g: Game, p: Player): Player | null {
   return best;
 }
 
+/** Where everyone stands during a called play, by order among the off-ball teammates. */
+const PLAY_SPOTS: Record<string, [number, number][]> = {
+  iso: [[26, 4], [26, 46], [9, 3], [9, 47]], // clear out: corners and the dunker spots
+  three: [[24, 25], [23, 9], [23, 41], [21, 4], [21, 46]], // everyone behind the arc
+  post: [[24, 25], [23, 9], [23, 41], [12, 40]], // shooters spread while the big posts low
+  screen: [[26, 5], [26, 45], [9, 4]], // spread while the big screens and rolls
+};
+
+/**
+ * The off-ball spot a called play asks of this player, or null to fall back to the usual
+ * movement (a rolling screener keeps using the cut logic).
+ */
+function playTarget(g: Game, p: Player, owner: Player): [number, number] | null {
+  const play = g.play!;
+  const hx = hoopX(p.team);
+  const s = backDir(p.team);
+  const mates = g.teamPlayers(p.team).filter((q) => q !== owner);
+  if (!mates.includes(p)) return null;
+  const at = (d: [number, number]): [number, number] => [hx + s * d[0], d[1]];
+  if (play === 'post' || play === 'screen') {
+    const big = mates.reduce((a, b) => (b.slot > a.slot ? b : a));
+    if (p === big) {
+      if (play === 'post') return at([5, 16]); // post up on the low block
+      if (p.ai.cutT > 0) return null; // screen set: rolling to the rim
+      if (dist(p.x, p.y, owner.x, owner.y) < 4) { p.ai.cutT = 1.6; return null; }
+      return [owner.x + s * 2, owner.y]; // come set the screen
+    }
+    const i = mates.filter((q) => q !== big).indexOf(p);
+    return at(PLAY_SPOTS[play][i] ?? PLAY_SPOTS[play][0]);
+  }
+  return at(PLAY_SPOTS[play][mates.indexOf(p)] ?? PLAY_SPOTS[play][0]);
+}
+
 function offBall(g: Game, p: Player, it: Intent) {
   const ai = p.ai;
   const hx = hoopX(p.team);
@@ -203,6 +236,14 @@ function offBall(g: Game, p: Player, it: Intent) {
   if (p.slot >= 3 && p.r.sht >= 85) tx = hx + s * 21;
 
   const owner = g.ball.owner;
+  // A called play overrides the usual spacing for the user's teammates.
+  if (g.play && p.team === 0 && g.offense === 0 && owner?.team === 0 && owner !== p) {
+    const spot = playTarget(g, p, owner);
+    if (spot) {
+      moveTo(p, it, spot[0], clamp(spot[1], 2, 48));
+      return;
+    }
+  }
   if (ai.jitterT <= 0) {
     ai.jitterT = g.rand(1.5, 3.5);
     ai.jx = g.rand(-3, 3);

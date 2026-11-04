@@ -81,6 +81,17 @@ export function userCourt(name: string): CourtStyle {
   return { ...COURTS['Pallet Town'], venue: `${name} Arena`, floorText: n, board: `HOME OF THE ${n} ★ PALLET TOWN ★ WHERE IT ALL BEGINS` };
 }
 
+/** The user's private practice court: their arena after hours, plain boards and an empty feel. */
+export function privateCourt(name: string): CourtStyle {
+  const n = name.toUpperCase();
+  return {
+    ...COURTS['Pallet Town'],
+    venue: `${name} Practice Facility`, floorText: 'PRIVATE COURT',
+    board: `${n} PRIVATE COURT ★ CLOSED SESSION ★ PRACTICE MAKES PERFECT`, boardColor: '#9fd0ff',
+    crowd: ['#3a4256', '#2e3242', '#454d63', '#2e3242'], // empty seats, basically
+  };
+}
+
 /** A team's home court; teams without a designed floor get a classic one in their colors. */
 export function courtFor(team: { name: string; color: string; color2: string }): CourtStyle {
   return COURTS[team.name] ?? {

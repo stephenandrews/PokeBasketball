@@ -90,7 +90,7 @@ describe('MasterSound', () => {
     const { sound, deps, stats } = setup();
     sound.start();
     expect(deps.music.hold).toHaveBeenCalledWith(true);
-    expect(deps.voice.speak).toHaveBeenCalledWith('Pallet Town is a PokeJam Master!', expect.any(Number));
+    expect(deps.voice.speak).toHaveBeenCalledWith('Pallet Town is a PokeBBall Master!', expect.any(Number));
     expect(stats.started).toBeGreaterThan(100);
     sound.stop();
   });

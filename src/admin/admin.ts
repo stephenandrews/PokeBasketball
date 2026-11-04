@@ -44,7 +44,7 @@ const MODE_LABEL = { quick: 'Quick Play', franchise: 'Franchise', season_draft: 
 
 
 function shell(inner: string) {
-  root.innerHTML = `<main class="admin"><header><h1>Poké Jam moderation</h1><span data-who></span></header>${inner}</main>`;
+  root.innerHTML = `<main class="admin"><header><h1>PokeBBall moderation</h1><span data-who></span></header>${inner}</main>`;
 }
 
 async function main() {

@@ -208,7 +208,7 @@ export function resumeLink(search: string | undefined): void {
     return;
   }
   if (cb) {
-    void relayPut(relay(), cb).then((ok) => draw(ok ? { kind: 'approve' } : { kind: 'failed', text: 'Could not pass that back. Go back to the PokeJam tab.' }));
+    void relayPut(relay(), cb).then((ok) => draw(ok ? { kind: 'approve' } : { kind: 'failed', text: 'Could not pass that back. Go back to the PokeBBall tab.' }));
     return;
   }
   if (pending.pending) {

@@ -17,7 +17,7 @@ export const ZENITH_DECAY_POINTS = 25;
 /** Points you land on after dropping into the division below. */
 export const DEMOTE_POINTS = 75;
 
-export const TIERS = ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Prism', 'Eclipse', 'PokeJam Master'] as const;
+export const TIERS = ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Prism', 'Eclipse', 'PokeBBall Master'] as const;
 /** Every rank tier in climbing order, Zenith last. Source for user-facing rank lists. */
 export const ALL_TIER_NAMES: readonly string[] = [...TIERS, 'Zenith'];
 /** "Bronze, Silver, ..., Eclipse, PokeJam Master, then Zenith" (all 9 tiers, in order). */

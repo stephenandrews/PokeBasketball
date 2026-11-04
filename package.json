@@ -1,5 +1,5 @@
 {
-  "name": "poke-jam",
+  "name": "pokebball",
   "version": "0.1.0",
   "description": "Draft a squad of Pokémon and play arcade 5v5 basketball.",
   "scripts": {
@@ -8,7 +8,7 @@
     "dev": "vite",
     "prebuild": "npm run sprites",
     "build": "tsc --noEmit && vite build",
-    "postbuild": "npm run build:admin",
+    "postbuild": "npm run build:admin && node scripts/build-sw.mjs",
     "build:admin": "vite build -c vite.admin.config.ts",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",

@@ -47,7 +47,7 @@ export function bindShare(root: HTMLElement, text: string, onShared?: () => void
     if (!menu.hidden) return close();
     if (typeof navigator.share === 'function') {
       try {
-        await navigator.share({ title: 'PokeJam', text, url: SHARE_URL });
+        await navigator.share({ title: 'PokeBBall', text, url: SHARE_URL });
         onShared?.();
         return;
       } catch (err) {

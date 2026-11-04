@@ -8,7 +8,7 @@
     var app = document.getElementById('app');
     if (window.__bootOk || !app || app.children.length) return;
     app.innerHTML = '<div style="max-width:30em;margin:18vh auto 0;padding:0 20px;font:16px/1.5 system-ui,sans-serif;color:#f2f0e6;text-align:center">' +
-      '<h1 style="font-size:1.4em;margin:0 0 .5em">Poké Jam couldn’t load</h1>' +
+      '<h1 style="font-size:1.4em;margin:0 0 .5em">PokeBBall couldn’t load</h1>' +
       '<p>Your browser may be too old, or the page didn’t finish downloading. Reload the page, or update your browser (iPadOS/iOS 14 or later, Chrome 80 or later).</p>' +
       (detail ? '<p style="opacity:.6;font-size:.8em;word-break:break-word"></p>' : '') + '</div>';
     var p = app.querySelector('p:last-child');

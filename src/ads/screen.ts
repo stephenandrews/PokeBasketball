@@ -129,7 +129,7 @@ export function openAdvertise(root: HTMLElement, back: () => void) {
       <header class="ad-hero">
         <p class="ad-kicker">Courtside ads</p>
         <h1>Your name in lights<br><span>on every court.</span></h1>
-        <p class="ad-lede">Put your message on the LED board that runs along the sideline in every Poké Jam game. You pay from your own wallet, by <b>burning $PJAM</b> (the tokens leave the supply for good, and nobody receives them, not even us) or <b>in USDC</b>.</p>
+        <p class="ad-lede">Put your message on the LED board that runs along the sideline in every PokeBBall game. You pay from your own wallet, by <b>burning $PJAM</b> (the tokens leave the supply for good, and nobody receives them, not even us) or <b>in USDC</b>.</p>
         <div class="ad-stats" data-stats>${statHtml('—', 'PJAM burned for ads')}${statHtml('—', 'ads run')}${statHtml('—', 'spots live now')}</div>
       </header>
 

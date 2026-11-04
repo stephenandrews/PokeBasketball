@@ -73,7 +73,7 @@ const signatureOf = (r: unknown): string => {
  * `request({method: 'signAndSendTransaction'})` form (base58 of the serialized transaction) is tried once. Returns the signature.
  */
 export async function signAndSend(provider: PayProvider, built: BuiltTransfer, payer: string): Promise<string> {
-  if (!provider.signAndSendTransaction && !provider.request) throw new UsdcPayError('Open PokeJam in the Phantom app or browser extension to pay with USDC.', 'no-phantom');
+  if (!provider.signAndSendTransaction && !provider.request) throw new UsdcPayError('Open PokeBBall in the Phantom app or browser extension to pay with USDC.', 'no-phantom');
   try { await provider.connect?.(); } catch (e) { if (rejected(e)) throw new UsdcPayError('Cancelled in Phantom. You were not charged.', 'rejected'); }
   if (provider.publicKey && provider.publicKey.toString() !== payer) throw new UsdcPayError('Switch Phantom to the wallet you signed in with, then try again.', 'wrong-wallet');
   const bytes = built.transaction;

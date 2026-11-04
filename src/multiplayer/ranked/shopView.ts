@@ -146,7 +146,7 @@ export const USDC_NOTICES = {
   timeout: { tone: 'warn', text: 'Your payment was sent but is not confirmed yet. Do not pay again: check it below, or reopen the shop later. If your shields don\'t show up, email kungfudoom@mail.grokbot.com.' },
   confirmed: { tone: 'ok', text: 'Payment confirmed. Your Rank Shields are on your account.' },
   rejected: { tone: 'warn', text: 'Cancelled in Phantom. You were not charged.' },
-  noPhantom: { tone: 'bad', text: 'Open PokeJam in the Phantom app or browser extension to pay with USDC.' },
+  noPhantom: { tone: 'bad', text: 'Open PokeBBall in the Phantom app or browser extension to pay with USDC.' },
   wrongWallet: { tone: 'bad', text: 'Switch Phantom to the wallet you signed in with, then try again.' },
 } as const satisfies Record<string, ShopNotice>;
 

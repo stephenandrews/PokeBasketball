@@ -7,7 +7,7 @@ import type { SolanaWallet } from '@supabase/supabase-js';
 /** Where people without the extension / app go. */
 export const PHANTOM_DOWNLOAD_URL = 'https://phantom.app/download';
 /** The line the wallet shows when asking for the signature (Phantom requires one; no new lines allowed). */
-export const SIGN_IN_STATEMENT = 'Sign in to PokeJam. This only proves you own this wallet. It does not move funds or cost anything.';
+export const SIGN_IN_STATEMENT = 'Sign in to PokeBBall. This only proves you own this wallet. It does not move funds or cost anything.';
 
 /** The slice of Phantom's injected provider this module uses (a Supabase SolanaWallet, plus the flag Phantom sets). */
 export interface PhantomProvider extends SolanaWallet {
@@ -54,7 +54,7 @@ function safeOrigin(url: string): string {
 /** What the sign-in panel should offer for Phantom on this device. */
 export type PhantomAction =
   | { kind: 'sign-in' }
-  /** A phone with no injected wallet: hand off to the Phantom app. `browseHref` is the fallback, PokeJam in Phantom's browser. */
+  /** A phone with no injected wallet: hand off to the Phantom app. `browseHref` is the fallback, PokeBBall in Phantom's browser. */
   | { kind: 'deeplink'; browseHref: string }
   | { kind: 'install'; href: string };
 

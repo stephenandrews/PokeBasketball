@@ -1,4 +1,4 @@
-# Poké Jam
+# PokeBBall
 
 Draft five Pokémon, then play full-court 5-on-5 arcade basketball with them. NBA Jam pace and dunks, NBA 2K-style ratings, draft and shot meter, and Pokémon type matchups deciding who wins a shove.
 
@@ -26,7 +26,7 @@ See [SECURITY.md](SECURITY.md): a Content Security Policy on every page, escaped
 
 ## How it plays
 
-Poké Jam has two modes.
+PokeBBall has two modes.
 
 **Quick Play:** pick any Gym Leader or the Elite Four, snake-draft five Pokémon against them (60 seconds a pick), choose the venue, and play. Pure arcade: no stamina, nothing saved. Rematch, redraft or pick a new opponent afterwards.
 

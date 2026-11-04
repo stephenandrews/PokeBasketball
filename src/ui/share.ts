@@ -1,5 +1,5 @@
 // Share text for the final results screen. Pure: only display names and scores go in, nothing else.
-export const SHARE_URL = 'https://pokejam.xyz';
+export const SHARE_URL = 'https://pokebball.zublo.ai';
 /** A loss by this many points or fewer is "a close one". */
 export const CLOSE_MARGIN = 3;
 
@@ -15,10 +15,10 @@ export interface ShareInput {
 export function shareText({ opponent, userScore, oppScore, potg }: ShareInput): string {
   const opp = opponent.trim() || 'the CPU';
   const star = potg?.name ? ` Player of the game: ${potg.name} (${potg.pts} PTS)` : '';
-  if (userScore > oppScore) return `I beat ${opp} ${userScore}-${oppScore} on PokeJam! 🏀${star}`;
-  if (userScore === oppScore) return `Played ${opp} to a ${userScore}-${oppScore} tie on PokeJam 🏀 Can you beat them?`;
-  if (oppScore - userScore <= CLOSE_MARGIN) return `Lost a close one ${userScore}-${oppScore} to ${opp} on PokeJam 🏀 Can you beat them?`;
-  return `Got blown out ${userScore}-${oppScore} by ${opp} on PokeJam 🏀 Think you can do better?`;
+  if (userScore > oppScore) return `I beat ${opp} ${userScore}-${oppScore} on PokeBBall! 🏀${star}`;
+  if (userScore === oppScore) return `Played ${opp} to a ${userScore}-${oppScore} tie on PokeBBall 🏀 Can you beat them?`;
+  if (oppScore - userScore <= CLOSE_MARGIN) return `Lost a close one ${userScore}-${oppScore} to ${opp} on PokeBBall 🏀 Can you beat them?`;
+  return `Got blown out ${userScore}-${oppScore} by ${opp} on PokeBBall 🏀 Think you can do better?`;
 }
 
 /** Web intent link for posting on X. */

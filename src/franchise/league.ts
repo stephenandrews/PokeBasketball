@@ -297,7 +297,7 @@ function retireLegacy(f: Franchise) {
       t.roster = t.roster.map((x) => (x === u ? add : x));
       if (t.lineup) t.lineup = t.lineup.map((x) => (x === u ? add : x));
       f.freeAgents.splice(f.freeAgents.indexOf(add), 1);
-      f.news.unshift(`${old.name} left the league (retired from Poké Jam). ${t.name} signed ${monOf(f, add).name}.`);
+      f.news.unshift(`${old.name} left the league (retired from PokeBBall). ${t.name} signed ${monOf(f, add).name}.`);
     }
   }
   f.news = f.news.slice(0, 8);

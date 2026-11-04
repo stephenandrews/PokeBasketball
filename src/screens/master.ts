@@ -1,4 +1,4 @@
-// The PokeJam Master cutscene: after a title won with every badge, the nine badges light up one by one, the title
+// The PokeBBall Master cutscene: after a title won with every badge, the nine badges light up one by one, the title
 // slams in over the trophy and the team's Pokémon, and confetti falls. Badges, sprites and trophy are the game's own
 // art; only the glow, confetti and text are code.
 import { spriteUrl } from '../data/pokemon';
@@ -34,14 +34,14 @@ export function masterScreen(f: Franchise, done: () => void, sound?: MasterSound
     <button class="mm-skip" type="button" data-skip>Skip</button>
     <div class="mo-body mm-body" style="--tc:${me.color};--tc2:${me.color2}">
       <p class="eyebrow mm-eyebrow">${esc(me.name)} · ${esc(seasonLabel(f.season))}</p>
-      <h1 class="mm-title"><span>PokeJam</span> <span>Master</span></h1>
+      <h1 class="mm-title"><span>PokeBBall</span> <span>Master</span></h1>
       <div class="mm-stage">
         <div class="mm-side left">${uids.slice(0, half).map(sprite).join('')}</div>
         <div class="mm-trophy"><img class="trophy-img" src="${esc(TROPHY_IMG)}" alt="Championship trophy"></div>
         <div class="mm-side right">${uids.slice(half).map((u, i) => sprite(u, i + half)).join('')}</div>
       </div>
       <ul class="mm-badges" aria-label="Badges earned">${badges.map((b, i) => `<li class="mm-badge" data-i="${i}" title="${esc(b.label)}">${badgeSvg(b.name, true, 44)}</li>`).join('')}</ul>
-      <p class="mm-line">Every badge. The title. You are a PokeJam Master!</p>
+      <p class="mm-line">Every badge. The title. You are a PokeBBall Master!</p>
       <p class="mo-hint mm-hint">Tap to continue</p>
     </div>`;
   const timers: number[] = [];

@@ -326,7 +326,7 @@ export function hubScreen(root: HTMLElement, f: Franchise, settings: Settings, a
         <header class="hub-head" style="--tc:${me.color}">
           <button class="btn ghost small" data-a="menu">Menu</button>
           <div>
-            <h1>${esc(me.name)}${f.pokejamMaster !== undefined ? ' <span class="master-mark" title="Won the title with every badge">PokeJam Master</span>' : ''}</h1>
+            <h1>${esc(me.name)}${f.pokejamMaster !== undefined ? ' <span class="master-mark" title="Won the title with every badge">PokeBBall Master</span>' : ''}</h1>
             <p>Season ${f.season} · ${f.phase === 'done' ? 'Offseason' : weekLabel(f)} · ${rec(me)}, ${ordinal(place)} place</p>
           </div>
         </header>

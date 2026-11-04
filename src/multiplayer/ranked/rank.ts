@@ -58,7 +58,7 @@ export function tierLabel(tier: Tier): string {
     case 'Diamond':
       return tier;
     case 'Pokémon Master':
-      return 'PokeJam Master';
+      return 'PokeBBall Master';
     default: {
       const unseen: never = tier;
       return unseen;

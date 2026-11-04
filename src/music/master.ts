@@ -1,5 +1,5 @@
 /**
- * Sound for the PokeJam Master cutscene, built from the championship celebration's synth blocks. It runs about
+ * Sound for the PokeBBall Master cutscene, built from the championship celebration's synth blocks. It runs about
  * twelve seconds: a drum roll under nine rising marimba pings (one per badge as it lights), a huge G major chord
  * when the title slams in, the announcer, then an original brass theme that climbs to a last, bigger chord.
  * The ping scale, the theme and the chords are written for PokeJam; the key (G major) is deliberately not the
@@ -152,7 +152,7 @@ export class MasterSound {
     this.ctx = ctx;
     const t0 = ctx.currentTime + 0.06;
     scheduleMaster(this.rigFor(this.bus(LEVEL)), t0);
-    this.deps.voice.speak(`${this.name} is a PokeJam Master!`, 0.06 + ANNOUNCE_AT);
+    this.deps.voice.speak(`${this.name} is a PokeBBall Master!`, 0.06 + ANNOUNCE_AT);
     // With Music on, the happy title-card loop carries on under the finished scene, then fades out by itself.
     if (this.deps.music.enabled) this.loop(t0 + MASTER_SECONDS - 0.4);
   }

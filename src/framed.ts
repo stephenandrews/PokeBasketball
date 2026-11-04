@@ -5,6 +5,6 @@
 declare global {
   interface Window { __framed?: boolean }
 }
-if (typeof window !== 'undefined' && window.__framed) throw new Error('Poké Jam is framed by another site: not starting.');
+if (typeof window !== 'undefined' && window.__framed) throw new Error('PokeBBall is framed by another site: not starting.');
 
 export {};

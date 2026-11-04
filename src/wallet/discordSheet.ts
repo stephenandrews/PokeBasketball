@@ -111,7 +111,7 @@ async function resumeInSafari(ret: DiscordReturn): Promise<void> {
   if (ret.error || !ONLINE_CONFIGURED) {
     clearDiscordLanding(local());
     await reportDiscordFailure(relay(), ret.id);
-    draw({ kind: 'failed', text: 'Discord sign-in didn\'t finish. Go back to the PokeJam app and try again.' });
+    draw({ kind: 'failed', text: 'Discord sign-in didn\'t finish. Go back to the PokeBBall app and try again.' });
     return;
   }
   if (!ret.code) {

@@ -117,7 +117,7 @@ export async function renderShareCard(t: SharedTeam): Promise<HTMLCanvasElement>
 
   ctx.fillStyle = '#9aa0c8';
   ctx.font = `700 34px ${sans}`;
-  ctx.fillText('pokejam.xyz', SIZE / 2, SIZE - 44);
+  ctx.fillText('pokebball.zublo.ai', SIZE / 2, SIZE - 44);
   ctx.textAlign = 'left';
   return c;
 }
@@ -269,7 +269,7 @@ export async function renderDraftCard(t: SharedTeam): Promise<HTMLCanvasElement>
   ctx.fillStyle = '#9aa0c8';
   ctx.font = `700 34px ${sans}`;
   ctx.textAlign = 'center';
-  ctx.fillText('pokejam.xyz', SIZE / 2, SIZE - 40);
+  ctx.fillText('pokebball.zublo.ai', SIZE / 2, SIZE - 40);
   ctx.textAlign = 'left';
   return c;
 }
@@ -287,8 +287,8 @@ export function fileName(t: SharedTeam): string {
 /** The message that goes with a shared team: record, grade and the #s= link. */
 export function shareText(t: SharedTeam, url: string): string {
   const { grade, ovr } = teamGrade(t.dex.map((d) => monByDex(d)));
-  if (t.noRecord) return `My PokeJam draft: ${t.name}, grade ${grade}, ${ovr} OVR ${url}`;
-  return `My PokeJam team went ${t.w}-${t.l}, grade ${grade} ${url}`;
+  if (t.noRecord) return `My PokeBBall draft: ${t.name}, grade ${grade}, ${ovr} OVR ${url}`;
+  return `My PokeBBall team went ${t.w}-${t.l}, grade ${grade} ${url}`;
 }
 
 export const toPngBlob = (c: HTMLCanvasElement) => toBlob(c);
@@ -305,7 +305,7 @@ export async function shareTeam(c: HTMLCanvasElement, blob: Blob | null, t: Shar
     const file = new File([blob], name, { type: 'image/png' });
     if (navigator.canShare({ files: [file], text })) {
       try {
-        await navigator.share({ files: [file], title: 'Poké Jam', text });
+        await navigator.share({ files: [file], title: 'PokeBBall', text });
         return 'shared';
       } catch (e) {
         if ((e as DOMException).name === 'AbortError') return 'cancelled';

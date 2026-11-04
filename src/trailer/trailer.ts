@@ -1,4 +1,4 @@
-// Poké Jam trailer #2, rendered from the real game engine.
+// PokeBBall trailer #2, rendered from the real game engine.
 // Seeded CPU-vs-CPU games on the Indigo Plateau court are scanned for highlights, then replayed frame by
 // frame (slow motion on the big moments) between title scenes: the opening jump ball, the 287-Pokémon
 // wall, the draft clock, Kyogre vs Groudon, the badge case, evolution and a $PJAM end card.

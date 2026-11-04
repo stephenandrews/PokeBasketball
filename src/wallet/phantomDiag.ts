@@ -32,9 +32,9 @@ const FIXED = {
   /** Phantom reported an error and the code was not one we know (also what older builds send). */
   'PH-UNK': { msg: "Phantom couldn't finish that. Try again.", relay: 1 },
   /** Safari signed in but could not leave the result for the app. Local to Safari: it cannot be relayed. */
-  'HO-PUT': { msg: "Couldn't hand the sign-in back to the app. Go back to PokeJam and try again.", relay: null },
+  'HO-PUT': { msg: "Couldn't hand the sign-in back to the app. Go back to PokeBBall and try again.", relay: null },
   /** Safari could not pass Phantom's answer to the tab that holds the key. Local. */
-  'HO-PASS': { msg: "Couldn't pass Phantom's answer back to PokeJam. Go back to PokeJam and try again.", relay: null },
+  'HO-PASS': { msg: "Couldn't pass Phantom's answer back to PokeBBall. Go back to PokeBBall and try again.", relay: null },
   /** The app got the handed-back box but could not open it. Local to the app. */
   'HB-READ': { msg: "The app couldn't read the handed-back sign-in. Try again.", relay: null },
   /** Anything unexpected. */

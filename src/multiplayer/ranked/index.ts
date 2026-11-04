@@ -224,7 +224,7 @@ export function mountSignIn(slot: HTMLElement, o: { returnTo: 'ranked' | 'profil
       startPhantomLink(e.currentTarget as HTMLAnchorElement, o.returnTo);
     } catch {
       e.preventDefault(); // no sessionStorage (a locked-down browser): this tab can't hold the key
-      again('This browser is blocking the storage sign-in needs. Try Open PokeJam in Phantom.');
+      again('This browser is blocking the storage sign-in needs. Try Open PokeBBall in Phantom.');
     }
   });
   slot.querySelector('[data-a="phantom"]')?.addEventListener('click', async () => {

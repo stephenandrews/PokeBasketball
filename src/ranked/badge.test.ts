@@ -26,12 +26,12 @@ describe('rank badge art', () => {
     expect(badgeImgHtml(ZENITH_IDX)).toContain('ranks/zenith.png');
     expect(badgeImgHtml(ZENITH_IDX)).toContain('alt="Zenith"');
     expect(badgeImgHtml(0)).toContain('alt="Bronze"');
-    expect(badgeImgHtml(TOP_DIV)).toContain('alt="PokeJam Master"');
+    expect(badgeImgHtml(TOP_DIV)).toContain('alt="PokeBBall Master"');
     expect(badgeImgHtml(0)).toContain('@2x.png 2x');
   });
   it('local-mock badge: image for a tier, nothing when unranked', () => {
     expect(badgeImgForTier('Gold')).toContain('ranks/gold.png');
-    expect(badgeImgForTier('Pokémon Master')).toContain('alt="PokeJam Master"');
+    expect(badgeImgForTier('Pokémon Master')).toContain('alt="PokeBBall Master"');
     expect(badgeImgForTier(null)).toBe('');
     expect(badgeUrl('gold', true)).toMatch(/ranks\/gold@2x\.png$/);
   });

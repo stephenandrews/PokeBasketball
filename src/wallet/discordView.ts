@@ -19,9 +19,9 @@ export function discordBodyHtml(s: DiscordSheet): string {
         <div class="ph-btns"><a class="btn primary big" data-a="discord-open" href="${esc(s.url)}" target="_blank" rel="noopener">Open Safari</a>
         <button class="btn ghost" type="button" data-a="discord-cancel">Cancel</button></div>`;
     case 'opening':
-      return `<p class="ph-msg">Opening Discord…</p><p class="note center">You'll come back here, then go back to the PokeJam app.</p>`;
+      return `<p class="ph-msg">Opening Discord…</p><p class="note center">You'll come back here, then go back to the PokeBBall app.</p>`;
     case 'done':
-      return `<p class="ph-msg">Signed in — go back to the PokeJam app on your home screen.</p>
+      return `<p class="ph-msg">Signed in — go back to the PokeBBall app on your home screen.</p>
         ${codeLine(s.code)}
         <button class="btn ghost" type="button" data-a="discord-close">Close</button>`;
     case 'failed':

@@ -141,7 +141,7 @@ describe('home-screen URLs', () => {
     expect(handoffCode(id)).toBe(id.slice(-4).toUpperCase());
     expect(sheetHtml({ kind: 'wait-safari', code: 'AB12' })).toContain('AB12');
     expect(sheetHtml({ kind: 'sign-ready', href: 'https://x', newTab: false, code: 'AB12' })).toContain('AB12');
-    expect(sheetHtml({ kind: 'safari-done', code: 'AB12' })).toContain('Signed in — go back to the PokeJam app on your home screen');
+    expect(sheetHtml({ kind: 'safari-done', code: 'AB12' })).toContain('Signed in — go back to the PokeBBall app on your home screen');
   });
 });
 

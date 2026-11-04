@@ -161,13 +161,13 @@ export interface Franchise {
   offers?: TradeOffer[];
 }
 
-/** A rival GM's offer: their players (`give`) and cash for yours (`get`). */
+/** A rival GM's offer: their players (`give`) for yours (`get`). */
 export interface TradeOffer {
   team: number;
   give: string[];
   get: string[];
-  /** $M they add on top. */
-  cash: number;
+  /** $M on top, from before trades moved to cap space. Ignored; kept so old saves parse. */
+  cash?: number;
   week: number;
 }
 
@@ -198,8 +198,13 @@ const emptyStats = (): SeasonStats => ({ gp: 0, pts: 0, fgm: 0, fga: 0, tpm: 0, 
 
 /** $M every team is granted at each season tipoff, after payroll comes out. */
 export const SEASON_BUDGET = 10;
-/** What one $M is worth on the trade market, in trade-value points. */
-const CASH_VALUE = 12;
+/** The salary cap, $M per season. A trade may not leave a payroll above it (unless it comes down). */
+export const SALARY_CAP = 12;
+/** Rosters stay inside these bounds through trades; the offseason cuts everyone back to ten. */
+export const ROSTER_MIN = 8;
+export const ROSTER_MAX = 12;
+/** What shedding one $M/yr of salary (cap relief) is worth to a GM, in trade-value points. */
+const SALARY_VALUE = 12;
 /** Ratings lost per week of post-injury rust (capped at −6). */
 const RUST_PENALTY = 2;
 
@@ -212,6 +217,8 @@ export const salaryOf = (f: Franchise, uid: string): number => f.players[uid].sa
 
 export const payrollOf = (f: Franchise, t: FTeam): number =>
   Math.round(t.roster.reduce((a, u) => a + salaryOf(f, u), 0) * 10) / 10;
+
+export const capSpaceOf = (f: Franchise, t: FTeam): number => Math.round((SALARY_CAP - payrollOf(f, t)) * 10) / 10;
 
 export const cashOf = (t: FTeam): number => Math.round((t.cash ?? 0) * 10) / 10;
 
@@ -797,52 +804,86 @@ export interface TradeVerdict {
   reason: string;
 }
 
-/** The other GM's answer to `give` (yours, plus `cash` $M) for `get` (theirs). */
-export function judgeTrade(f: Franchise, teamId: number, give: string[], get: string[], cash = 0): TradeVerdict {
+const sumSalary = (f: Franchise, us: string[]) => us.reduce((a, u) => a + salaryOf(f, u), 0);
+
+/**
+ * Whether a trade works under the cap for one side: the new payroll fits, or at least comes
+ * down (an over-cap team may always shed salary, never add it).
+ */
+function fitsCap(f: Franchise, t: FTeam, salaryOut: number, salaryIn: number): boolean {
+  const now = payrollOf(f, t);
+  const after = Math.round((now - salaryOut + salaryIn) * 10) / 10;
+  return after <= SALARY_CAP || after <= now;
+}
+
+/**
+ * The other GM's answer to `give` (yours) for `get` (theirs). Any number of players on either
+ * side: the books just have to work (cap and roster bounds), and shedding salary is worth
+ * something — a GM will take a lesser player to get out from under a contract.
+ */
+export function judgeTrade(f: Franchise, teamId: number, give: string[], get: string[]): TradeVerdict {
   if (!canTrade(f)) return { ok: false, lean: 0, reason: 'The trade deadline has passed. Trading reopens in the offseason.' };
-  if (!give.length || give.length !== get.length) return { ok: false, lean: 0, reason: 'Pick the same number of players on each side (1 or 2).' };
-  if (cash > cashOf(f.teams[0])) return { ok: false, lean: 0, reason: "You don't have that much cash." };
+  if (!give.length && !get.length) return { ok: false, lean: 0, reason: 'Pick at least one player.' };
+  const me = f.teams[0];
   const them = f.teams[teamId];
-  const incoming = give.reduce((a, u) => a + tradeValue(f, u, them), 0) + cash * CASH_VALUE;
-  const outgoing = get.reduce((a, u) => a + tradeValue(f, u, them), 0);
+  const who = them.leader ?? them.name;
+  const myCount = me.roster.length - give.length + get.length;
+  const theirCount = them.roster.length - get.length + give.length;
+  if (myCount < ROSTER_MIN || myCount > ROSTER_MAX) {
+    return { ok: false, lean: 0, reason: `Your roster must stay between ${ROSTER_MIN} and ${ROSTER_MAX} players (this leaves you ${myCount}).` };
+  }
+  if (theirCount < ROSTER_MIN || theirCount > ROSTER_MAX) {
+    return { ok: false, lean: 0, reason: `${who}: "We have to keep between ${ROSTER_MIN} and ${ROSTER_MAX} players."` };
+  }
+  const giveSal = sumSalary(f, give);
+  const getSal = sumSalary(f, get);
+  if (!fitsCap(f, me, giveSal, getSal)) {
+    return { ok: false, lean: 0, reason: `That puts you over the ${fmtM(SALARY_CAP)} cap. Send out more salary, or take back less.` };
+  }
+  if (!fitsCap(f, them, getSal, giveSal)) {
+    return { ok: false, lean: 0, reason: `${who}: "That puts us over the cap. Take some salary back and we'll talk."` };
+  }
+  // Their view of the deal: the players they receive, plus whatever salary the trade sheds for
+  // them (cap relief is worth paying for — that's how you buy stars with bad contracts).
+  const relief = getSal - giveSal;
+  const incoming = give.reduce((a, u) => a + tradeValue(f, u, them), 0) + Math.max(0, relief) * SALARY_VALUE;
+  const outgoing = get.reduce((a, u) => a + tradeValue(f, u, them), 0) + Math.max(0, -relief) * SALARY_VALUE;
   // They want to come out a little ahead.
   const ratio = incoming / Math.max(1, outgoing * 1.05);
   const lean = Math.max(-1, Math.min(1, (ratio - 1) * 2.5));
-  const who = them.leader ?? them.name;
   if (ratio >= 1) return { ok: true, lean, reason: `${who}: "Deal!"` };
   if (ratio >= 0.85) return { ok: false, lean, reason: `${who}: "Close. Add a little more."` };
   if (ratio >= 0.6) return { ok: false, lean, reason: `${who}: "That's not enough."` };
   return { ok: false, lean, reason: `${who}: "Not even close."` };
 }
 
-/** Swaps the players (and any cash, $M from the user to `teamId`) with no questions asked. */
-function swapPlayers(f: Franchise, teamId: number, give: string[], get: string[], cash: number) {
+/** Moves the players with no questions asked. New arrivals join the end of the user's depth chart. */
+function swapPlayers(f: Franchise, teamId: number, give: string[], get: string[]) {
   const me = f.teams[0];
   const them = f.teams[teamId];
-  me.roster = me.roster.map((u) => (give.includes(u) ? get[give.indexOf(u)] : u));
-  them.roster = them.roster.map((u) => (get.includes(u) ? give[get.indexOf(u)] : u));
-  if (me.lineup) me.lineup = me.lineup.map((u) => (give.includes(u) ? get[give.indexOf(u)] : u));
+  me.roster = [...me.roster.filter((u) => !give.includes(u)), ...get];
+  them.roster = [...them.roster.filter((u) => !get.includes(u)), ...give];
+  if (me.lineup) me.lineup = [...me.lineup.filter((u) => !give.includes(u)), ...get];
   delete them.lineup;
   if (me.captain && give.includes(me.captain)) delete me.captain;
   if (them.captain && get.includes(them.captain)) delete them.captain;
-  me.cash = Math.max(0, Math.round((cashOf(me) - cash) * 10) / 10);
-  them.cash = Math.max(0, Math.round((cashOf(them) + cash) * 10) / 10);
 }
 
-export function makeTrade(f: Franchise, teamId: number, give: string[], get: string[], cash = 0): boolean {
-  if (!judgeTrade(f, teamId, give, get, cash).ok) return false;
+export function makeTrade(f: Franchise, teamId: number, give: string[], get: string[]): boolean {
+  if (!judgeTrade(f, teamId, give, get).ok) return false;
   const them = f.teams[teamId];
-  swapPlayers(f, teamId, give, get, cash);
-  const names = (us: string[]) => us.map((u) => monOf(f, u).name).join(' and ');
-  f.news.unshift(`Trade! ${f.teams[0].name} send ${names(give)}${cash ? ` and ${fmtM(cash)}` : ''} to ${them.name} for ${names(get)}.`);
+  const names = (us: string[]) => (us.length ? us.map((u) => monOf(f, u).name).join(' and ') : 'cap space');
+  swapPlayers(f, teamId, give, get);
+  f.news.unshift(`Trade! ${f.teams[0].name} send ${names(give)} to ${them.name} for ${names(get)}.`);
   f.news = f.news.slice(0, 8);
   return true;
 }
 
 /**
- * Once a week during the season a rival GM may call with an offer: one of their players (plus cash
- * if they're short on value) for one of your three most tempting players. Offers that can't be made
- * at least fair for you never go out.
+ * Once a week during the season a rival GM may call with an offer for one of your three most
+ * tempting players: their closest player in value, with a second thrown in when one isn't
+ * enough. Offers that can't be made at least fair for you, or that break the cap or the
+ * roster bounds on either side, never go out.
  */
 export function maybeAiOffer(f: Franchise, rng: () => number = Math.random) {
   if (!canTrade(f) || f.phase !== 'season' || rng() >= 0.4) return;
@@ -852,27 +893,41 @@ export function maybeAiOffer(f: Franchise, rng: () => number = Math.random) {
   const targets = [...me.roster].sort((a, b) => tradeValue(f, b, them) - tradeValue(f, a, them)).slice(0, 3);
   const want = targets[Math.floor(rng() * targets.length)];
   if (!want) return;
-  const wantVal = tradeValue(f, want, them);
-  // Their sweetener: the player of theirs closest to that value, topped up with cash.
-  const give = [...them.roster].sort((a, b) =>
-    Math.abs(tradeValue(f, a, them) - wantVal) - Math.abs(tradeValue(f, b, them) - wantVal))[0];
-  if (!give) return;
-  const gap = wantVal * 1.02 - tradeValue(f, give, them);
-  const cash = Math.min(Math.max(0, Math.ceil(gap / CASH_VALUE)), Math.floor(cashOf(them)));
-  if (tradeValue(f, give, them) + cash * CASH_VALUE < wantVal) return; // they can't afford a fair offer
-  f.offers = [{ team: them.id, give: [give], get: [want], cash, week: f.week }];
+  // What the trade is worth to YOU: their players straight up, no type bonus.
+  const myView = (us: string[]) => us.reduce((a, u) => a + tradeValue(f, u), 0);
+  const wantVal = tradeValue(f, want);
+  const closest = [...them.roster].sort((a, b) =>
+    Math.abs(tradeValue(f, a) - wantVal) - Math.abs(tradeValue(f, b) - wantVal));
+  let give = closest.slice(0, 1);
+  // One player short of fair? They throw in their cheapest piece to close the gap.
+  if (myView(give) < wantVal && closest.length > 1) {
+    const filler = [...closest.slice(1)].sort((a, b) => tradeValue(f, a) - tradeValue(f, b))[0];
+    give = [...give, filler];
+  }
+  if (myView(give) < wantVal) return; // still not fair for you: no call
+  const giveSal = sumSalary(f, give);
+  const wantSal = sumSalary(f, [want]);
+  if (!fitsCap(f, me, wantSal, giveSal) || !fitsCap(f, them, giveSal, wantSal)) return;
+  const myCount = me.roster.length - 1 + give.length;
+  const theirCount = them.roster.length - give.length + 1;
+  if (myCount > ROSTER_MAX || theirCount < ROSTER_MIN) return;
+  f.offers = [{ team: them.id, give, get: [want], week: f.week }];
   f.news.unshift(`${them.leader ?? them.name} called with a trade offer for ${monOf(f, want).name}.`);
   f.news = f.news.slice(0, 8);
 }
 
-/** Takes the rival GM's standing offer. Their offer, their terms: no judging. */
+/** Takes the rival GM's standing offer. Their offer, their terms: no judging, just the books. */
 export function acceptOffer(f: Franchise): boolean {
   const o = f.offers?.[0];
   if (!o || !canTrade(f)) return false;
+  const me = f.teams[0];
   const them = f.teams[o.team];
-  swapPlayers(f, o.team, o.get, o.give, -o.cash);
+  // The rosters may have shifted since they called: the books still have to work.
+  if (!o.get.every((u) => me.roster.includes(u)) || !o.give.every((u) => them.roster.includes(u))) { f.offers = []; return false; }
+  if (!fitsCap(f, me, sumSalary(f, o.get), sumSalary(f, o.give))) { f.offers = []; return false; }
+  swapPlayers(f, o.team, o.get, o.give);
   const names = (us: string[]) => us.map((u) => monOf(f, u).name).join(' and ');
-  f.news.unshift(`Trade! ${them.name} send ${names(o.give)}${o.cash ? ` and ${fmtM(o.cash)}` : ''} to ${f.teams[0].name} for ${names(o.get)}.`);
+  f.news.unshift(`Trade! ${them.name} send ${names(o.give)} to ${f.teams[0].name} for ${names(o.get)}.`);
   f.news = f.news.slice(0, 8);
   f.offers = [];
   return true;
@@ -1072,21 +1127,25 @@ export function rookiePick(f: Franchise, uid?: string): string | null {
   return pick;
 }
 
-/** CPU teams cut their least valuable player; the user cuts `release`. Then the next season starts. */
-export function finishRookieDraft(f: Franchise, release: string) {
+/** How many players a roster must drop at the offseason cut-down (trades can swell it past ten). */
+export const cutsNeeded = (t: FTeam) => Math.max(0, t.roster.length - 10);
+
+/** CPU teams cut their least valuable players; the user cuts `releases`. Then the next season starts. */
+export function finishRookieDraft(f: Franchise, releases: string[]) {
   const r = f.rookies;
   if (!r || rookieOnClock(f)) return;
   const cut = (t: FTeam, uid: string) => {
     t.roster = t.roster.filter((u) => u !== uid);
     if (t.lineup) t.lineup = t.lineup.filter((u) => u !== uid);
+    if (t.captain === uid) delete t.captain;
     f.freeAgents.push(uid);
   };
   const me = f.teams[0];
-  // Retirements can leave a team short: nobody cuts below a ten-player roster.
-  if (me.roster.includes(release) && me.roster.length > 10) cut(me, release);
+  // Everyone cuts back down to ten; retirements can leave a team short, and nobody cuts below ten.
+  for (const u of releases) if (me.roster.includes(u) && me.roster.length > 10) cut(me, u);
   for (const t of f.teams) {
-    if (t.human || t.roster.length <= 10) continue;
-    cut(t, t.roster.reduce((a, b) => (tradeValue(f, b, t) < tradeValue(f, a, t) ? b : a)));
+    if (t.human) continue;
+    while (t.roster.length > 10) cut(t, t.roster.reduce((a, b) => (tradeValue(f, b, t) < tradeValue(f, a, t) ? b : a)));
   }
   const mine = r.picks[r.order.indexOf(0)];
   delete f.rookies;

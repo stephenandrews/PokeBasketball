@@ -1,6 +1,6 @@
 import { POSITIONS, monByDex, spriteUrl, type Pos } from '../data/pokemon';
 import {
-  acceptOffer, badgesEarned, canSign, canTrade, cashOf, declineOffer, finalWeek, fmtM, judgeTrade, lineupOf, makeTrade, payrollOf, resetLineup, salaryOf, setCaptain, signingFee, swapInLineup, tradeDeadline, venueOf, monOf, perGame, sign, standings, teamOvrOf, userGame, weekGames, weekLabel,
+  ROSTER_MAX, ROSTER_MIN, SALARY_CAP, acceptOffer, badgesEarned, canSign, canTrade, cashOf, declineOffer, finalWeek, fmtM, judgeTrade, lineupOf, makeTrade, payrollOf, resetLineup, salaryOf, setCaptain, signingFee, swapInLineup, tradeDeadline, venueOf, monOf, perGame, sign, standings, teamOvrOf, userGame, weekGames, weekLabel,
   xpToNext, type FGame, type FTeam, type Franchise,
 } from '../franchise/league';
 import { badgeSvg } from '../ui/badges';
@@ -123,7 +123,7 @@ function offerHtml(f: Franchise): string {
       <h3 class="sec">Trade offer · ${esc(them.name)}</h3>
       <p class="note">${esc(them.leader ?? them.name)} offers:</p>
       <div class="offer-cols">
-        <div><h4>You get</h4><ul>${o.give.map(who).join('')}${o.cash ? `<li class="cash-line"><b>+ ${fmtM(o.cash)}</b></li>` : ''}</ul></div>
+        <div><h4>You get</h4><ul>${o.give.map(who).join('')}</ul></div>
         <div><h4>You give</h4><ul>${o.get.map(who).join('')}</ul></div>
       </div>
       <div class="actions">
@@ -278,11 +278,12 @@ function scoresHtml(f: Franchise): string {
     </section>`;
 }
 
-interface TradeDraft { team: number; give: string[]; get: string[]; cash: number }
+interface TradeDraft { team: number; give: string[]; get: string[] }
 
 function tradeSheet(f: Franchise, tr: TradeDraft): string {
+  const me = f.teams[0];
   const them = f.teams[tr.team];
-  const verdict = judgeTrade(f, tr.team, tr.give, tr.get, tr.cash);
+  const verdict = judgeTrade(f, tr.team, tr.give, tr.get);
   const row = (u: string, side: 'give' | 'get') => {
     const m = monOf(f, u);
     const p = f.players[u];
@@ -296,7 +297,12 @@ function tradeSheet(f: Franchise, tr: TradeDraft): string {
   };
   const sortByOvr = (us: string[]) => [...us].sort((a, b) => monOf(f, b).ovr - monOf(f, a).ovr);
   const pct = Math.round((verdict.lean + 1) * 50);
-  const myCash = cashOf(f.teams[0]);
+  const sal = (us: string[]) => us.reduce((a, u) => a + salaryOf(f, u), 0);
+  const after = (t: FTeam, out: string[], inn: string[]) => Math.round((payrollOf(f, t) - sal(out) + sal(inn)) * 10) / 10;
+  const capLine = (label: string, t: FTeam, out: string[], inn: string[]) => {
+    const a = after(t, out, inn);
+    return `<span class="cap-line ${a > SALARY_CAP ? 'over' : ''}">${label}: ${fmtM(payrollOf(f, t))} → <b>${fmtM(a)}</b> of the ${fmtM(SALARY_CAP)} cap</span>`;
+  };
   return `
     <div class="sheet-bg">
       <div class="sheet trade-sheet" role="dialog" aria-label="Trade">
@@ -304,16 +310,14 @@ function tradeSheet(f: Franchise, tr: TradeDraft): string {
         <h3>Trade</h3>
         <div class="trade-teams">${f.teams.filter((t) => !t.human).map((t) =>
           `<button class="${t.id === tr.team ? 'on' : ''}" data-tteam="${t.id}" style="--tc:${t.color}" title="${esc(t.name)}">${esc(t.abbr)}</button>`).join('')}</div>
-        <p class="note">${esc(them.name)}${them.leader ? ` (${esc(them.leader)})` : ''}${them.types?.length ? ` likes ${them.types.join('/')} types` : ''}. Pick the same number of players on each side, up to two. Salaries travel with the players.</p>
+        <p class="note">${esc(them.name)}${them.leader ? ` (${esc(them.leader)})` : ''}${them.types?.length ? ` likes ${them.types.join('/')} types` : ''}. Trade any number of players either way — both payrolls just have to fit the cap (rosters stay ${ROSTER_MIN}-${ROSTER_MAX}). Taking salary off a GM's books is worth real value to them.</p>
         <div class="trade-cols">
-          <div><h4>You give</h4><ul>${sortByOvr(f.teams[0].roster).map((u) => row(u, 'give')).join('')}</ul></div>
+          <div><h4>You give</h4><ul>${sortByOvr(me.roster).map((u) => row(u, 'give')).join('')}</ul></div>
           <div><h4>You get</h4><ul>${sortByOvr(them.roster).map((u) => row(u, 'get')).join('')}</ul></div>
         </div>
-        <div class="trade-cash">
-          <span>Sweeten with cash <small>(you have ${fmtM(myCash)})</small></span>
-          <button class="btn small ghost" data-cash="-1" ${tr.cash <= 0 ? 'disabled' : ''}>−</button>
-          <b>${fmtM(tr.cash)}</b>
-          <button class="btn small ghost" data-cash="1" ${tr.cash >= Math.floor(myCash) ? 'disabled' : ''}>+</button>
+        <div class="trade-cap">
+          ${capLine('You', me, tr.give, tr.get)}
+          ${capLine(esc(them.abbr), them, tr.get, tr.give)}
         </div>
         <div class="verdict ${verdict.ok ? 'ok' : ''}">
           <div class="meter"><i style="--v:${pct}%"></i></div>
@@ -368,7 +372,7 @@ export function hubScreen(root: HTMLElement, f: Franchise, settings: Settings, a
           <button class="btn ghost small" data-a="menu">Menu</button>
           <div>
             <h1>${esc(me.name)}${f.pokejamMaster !== undefined ? ' <span class="master-mark" title="Won the title with every badge">PokeBBall Master</span>' : ''}</h1>
-            <p>Season ${f.season} · ${f.phase === 'done' ? 'Offseason' : weekLabel(f)} · ${rec(me)}, ${ordinal(place)} place · <b class="cash" title="Cash on hand. Every team banks $10M at each season tipoff, minus payroll.">${fmtM(cashOf(me))}</b> <small>payroll ${fmtM(payrollOf(f, me))}/yr</small></p>
+            <p>Season ${f.season} · ${f.phase === 'done' ? 'Offseason' : weekLabel(f)} · ${rec(me)}, ${ordinal(place)} place · <b class="cash" title="Cash on hand. Every team banks $10M at each season tipoff, minus payroll.">${fmtM(cashOf(me))}</b> <small title="Team payroll against the league salary cap">payroll ${fmtM(payrollOf(f, me))} / ${fmtM(SALARY_CAP)} cap</small></p>
           </div>
           ${f.signature ? `<img class="owner-sig" src="${f.signature}" alt="Owner's signature" title="The owner's signature, from the day the franchise was founded">` : ''}
         </header>
@@ -429,25 +433,23 @@ export function hubScreen(root: HTMLElement, f: Franchise, settings: Settings, a
     if (t.classList.contains('sheet-bg')) { swapping = null; trading = null; render(); return; }
     if (trading) {
       const tr = trading;
-      const toggle = (list: string[], u: string) => (list.includes(u) ? list.filter((x) => x !== u) : [...list, u].slice(-2));
+      const toggle = (list: string[], u: string) => (list.includes(u) ? list.filter((x) => x !== u) : [...list, u]);
       const give = t.closest<HTMLElement>('[data-give]')?.dataset.give;
       const get = t.closest<HTMLElement>('[data-get]')?.dataset.get;
       const team = t.closest<HTMLElement>('[data-tteam]')?.dataset.tteam;
-      const cash = t.closest<HTMLElement>('[data-cash]')?.dataset.cash;
       if (give) tr.give = toggle(tr.give, give);
       else if (get) tr.get = toggle(tr.get, get);
-      else if (cash) tr.cash = Math.max(0, tr.cash + Number(cash));
-      else if (team) trading = { team: Number(team), give: tr.give, get: [], cash: tr.cash };
+      else if (team) trading = { team: Number(team), give: tr.give, get: [] };
       else if (t.closest('[data-a="close-trade"]')) trading = null;
-      else if (t.closest('[data-a="propose"]') && makeTrade(f, tr.team, tr.give, tr.get, tr.cash)) {
+      else if (t.closest('[data-a="propose"]') && makeTrade(f, tr.team, tr.give, tr.get)) {
         trading = null;
         act.saved();
       }
-      if (give || get || team || cash || !trading) { render(); return; }
+      if (give || get || team || !trading) { render(); return; }
     }
     const a = t.closest<HTMLElement>('[data-a]')?.dataset.a;
     const g = userGame(f);
-    if (a === 'trade') { trading = { team: 1, give: [], get: [], cash: 0 }; render(); return; }
+    if (a === 'trade') { trading = { team: 1, give: [], get: [] }; render(); return; }
     if (a === 'offer-accept') { acceptOffer(f); act.saved(); render(); return; }
     if (a === 'offer-decline') { declineOffer(f); act.saved(); render(); return; }
     if (a === 'lineup-edit') { editing = true; picked = null; render(); return; }

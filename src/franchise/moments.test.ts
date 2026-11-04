@@ -173,7 +173,7 @@ describe('new-season preview trigger', () => {
     while (rookieOnClock(f)) rookiePick(f);
     const me = f.teams[0];
     const mine = f.rookies!.picks[f.rookies!.order.indexOf(0)];
-    finishRookieDraft(f, me.roster.filter((u) => u !== mine).reduce((a, b) => (tradeValue(f, b) < tradeValue(f, a) ? b : a)));
+    finishRookieDraft(f, [me.roster.filter((u) => u !== mine).reduce((a, b) => (tradeValue(f, b) < tradeValue(f, a) ? b : a))]);
     expect(f.season).toBe(2);
     expect(shouldShowChampionship(f)).toBe(false);
     expect(shouldShowNewSeason(f)).toBe(true);

@@ -2,7 +2,7 @@
 // down to ten. The prospects are judged on what they grow into, so each card shows its final form.
 import { monByDex, spriteUrl } from '../data/pokemon';
 import {
-  finishRookieDraft, monOf, potentialOf, rookieLeft, rookieOnClock, rookiePick, tradeValue, type Franchise,
+  cutsNeeded, finishRookieDraft, monOf, potentialOf, rookieLeft, rookieOnClock, rookiePick, tradeValue, type Franchise,
 } from '../franchise/league';
 import type { Audio } from '../game/audio';
 import { esc, tier } from '../util';
@@ -23,7 +23,7 @@ export function rookieScreen(root: HTMLElement, f: Franchise, audio: Audio, act:
   host.replaceChildren(root);
   const me = f.teams[0];
   let selected: string | null = null;
-  let cutting: string | null = null;
+  let cutting: string[] = [];
   let cpuTimer = 0;
   let clockLeft = PICK_SECONDS * 1000;
   let clockFor = -1;
@@ -83,23 +83,25 @@ export function rookieScreen(root: HTMLElement, f: Franchise, audio: Audio, act:
     }).join('')}</ol>`;
   };
 
-  /** After the draft: cut one player to get back to ten. */
+  /** After the draft: cut back to ten (trades can swell a roster past it, so it may take several). */
   const cutHtml = () => {
     const sorted = [...me.roster].sort((a, b) => tradeValue(f, a) - tradeValue(f, b));
-    const must = me.roster.length > 10;
+    const need = cutsNeeded(me);
+    const left = need - cutting.length;
     return `
       <section class="card rk-cut">
-        <h3 class="sec">${must ? 'Cut one player' : 'Rookie draft complete'}</h3>
-        <p class="note">${must ? 'Rosters max out at ten. Whoever you cut goes to free agency; your lowest-value players are listed first.' : 'Your roster has room, so nobody needs to go.'} Every other team cuts its least valuable player.</p>
+        <h3 class="sec">${need ? `Cut ${need === 1 ? 'one player' : `${need} players`}` : 'Rookie draft complete'}</h3>
+        <p class="note">${need ? 'Rosters go into the season with ten. Whoever you cut goes to free agency; your lowest-value players are listed first.' : 'Your roster has room, so nobody needs to go.'} Every other team cuts down to ten too.</p>
         ${posTrackHtml(myMons(), 10)}
-        ${must ? `<ul class="fa-list">${sorted.map((u) => {
+        ${need ? `<ul class="fa-list">${sorted.map((u) => {
           const m = monOf(f, u);
           const pot = potentialOf(m.dex, f.players[u].bonus);
           const p = f.players[u];
-          return `<li class="${cutting === u ? 'picked' : ''}"><img src="${spriteUrl(m.dex)}" alt=""><span class="nm">${esc(m.name)}<small>${m.pos} · Lv ${p.level}${pot.dex !== m.dex ? ` · grows to ${pot.ovr}` : ''}${f.rookies!.picks.includes(u) ? ' · Rookie' : ''}</small></span><b class="t-${tier(m.ovr)}">${m.ovr}</b><button class="btn small ${cutting === u ? 'primary' : 'ghost'}" data-cut="${u}">${cutting === u ? 'Cut' : 'Select'}</button></li>`;
+          const on = cutting.includes(u);
+          return `<li class="${on ? 'picked' : ''}"><img src="${spriteUrl(m.dex)}" alt=""><span class="nm">${esc(m.name)}<small>${m.pos} · Lv ${p.level}${pot.dex !== m.dex ? ` · grows to ${pot.ovr}` : ''}${f.rookies!.picks.includes(u) ? ' · Rookie' : ''}</small></span><b class="t-${tier(m.ovr)}">${m.ovr}</b><button class="btn small ${on ? 'primary' : 'ghost'}" data-cut="${u}">${on ? 'Cut' : 'Select'}</button></li>`;
         }).join('')}</ul>` : ''}
         <div class="actions center">
-          <button class="btn primary big" data-a="start" ${must && !cutting ? 'disabled' : ''}>${must ? (cutting ? `Cut ${esc(monOf(f, cutting).name)} and start Season ${f.season + 1}` : 'Pick someone to cut') : `Start Season ${f.season + 1}`}</button>
+          <button class="btn primary big" data-a="start" ${left > 0 ? 'disabled' : ''}>${left > 0 ? `Pick ${left} more to cut` : need ? `Cut ${cutting.map((u) => esc(monOf(f, u).name)).join(', ')} and start Season ${f.season + 1}` : `Start Season ${f.season + 1}`}</button>
         </div>
       </section>`;
   };
@@ -184,13 +186,18 @@ export function rookieScreen(root: HTMLElement, f: Franchise, audio: Audio, act:
     if (t.closest('.pick') && selected && myTurn()) { take(selected); return; }
     if (t.closest('.close')) { selected = null; render(); return; }
     const cut = t.closest<HTMLElement>('[data-cut]')?.dataset.cut;
-    if (cut) { cutting = cutting === cut ? null : cut; render(); return; }
+    if (cut) {
+      // Toggle, but never select more than the roster needs to lose.
+      cutting = cutting.includes(cut) ? cutting.filter((u) => u !== cut) : [...cutting, cut].slice(-cutsNeeded(me));
+      render();
+      return;
+    }
     const a = t.closest<HTMLElement>('[data-a]')?.dataset.a;
     if (a === 'menu') { window.clearTimeout(cpuTimer); window.clearInterval(clock); act.menu(); }
     if (a === 'auto' && myTurn()) take(undefined, 'auto-picked');
-    if (a === 'start' && (cutting || me.roster.length <= 10)) {
+    if (a === 'start' && cutting.length >= cutsNeeded(me)) {
       window.clearInterval(clock);
-      finishRookieDraft(f, cutting ?? '');
+      finishRookieDraft(f, cutting);
       act.saved();
       act.done();
     }

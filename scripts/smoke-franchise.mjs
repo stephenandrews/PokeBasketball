@@ -50,10 +50,14 @@ await page.click('.roster-tbl [data-capt]');
 check('captain C appears', await page.isVisible('.roster-tbl .capt'));
 await page.click('[data-a="lineup-done"]');
 
-// Trade sheet: cash stepper present.
+// Trade sheet: cap lines, no cash, and more than two players selectable on one side.
 await page.click('[data-a="trade"]');
 await page.waitForSelector('.trade-sheet');
-check('trade cash sweetener', await page.isVisible('.trade-cash'));
+check('payroll vs cap shown in trade sheet', (await page.$$('.trade-cap .cap-line')).length === 2);
+check('no cash sweetener anymore', !(await page.isVisible('.trade-cash')));
+// The sheet re-renders on every pick: click by position, fresh each time.
+for (let i = 0; i < 3; i++) await page.click(`.trade-sheet .trade-cols div:first-child li:nth-child(${i + 1}) [data-give]`);
+check('three players selectable on one side', (await page.$$('.trade-sheet [data-give].on')).length === 3);
 check('types in trade sheet', (await page.$$('.trade-sheet .types i')).length > 0);
 await page.click('[data-a="close-trade"]');
 

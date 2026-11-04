@@ -2553,11 +2553,11 @@ body:has(.pause-btn) .music-btn:not(.docked) {
 .offer-cols .cash-line { justify-content: center; color: #ffd84d; }
 @media (max-width: 640px) { .offer-cols { grid-template-columns: 1fr; } }
 
-/* Cash sweetener in the trade sheet. */
-.trade-cash { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
-.trade-cash span { margin-right: auto; }
-.trade-cash small { opacity: 0.7; }
-.trade-cash b { min-width: 4.5em; text-align: center; color: #ffd84d; }
+/* Payroll-after-trade lines against the cap. */
+.trade-cap { display: grid; gap: 4px; margin: 8px 0; }
+.cap-line { font-size: 0.85em; opacity: 0.9; }
+.cap-line b { color: #8fe38f; }
+.cap-line.over b { color: #ff7a6b; }
 .trade-sheet .trade-row small { display: block; }
 .trade-sheet .trade-row .types { margin-top: 2px; }
 

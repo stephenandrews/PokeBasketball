@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { POKEMON, type Mon } from '../data/pokemon';
 import {
-  LEAGUE, PRACTICE_XP, SEASON_BUDGET, acceptOffer, cashOf, createFranchise, declineOffer, grantPracticeXp, judgeTrade, makeTrade, marketSalary, maybeAiOffer,
+  LEAGUE, PRACTICE_XP, SEASON_BUDGET, acceptOffer, cashOf, createFranchise, declineOffer, grantPracticeXp, judgeTrade, makeTrade, marketSalary, maybeAiOffer, tradeValue,
   monOf, nextSeason, payrollOf, retirementChance, runRetirements, salaryOf, setCaptain, sign, teamDef, type Franchise,
 } from './league';
 
@@ -125,26 +125,59 @@ describe('captains', () => {
   });
 });
 
-describe('trades with cash', () => {
-  it('cash sweetens a trade the GM would otherwise refuse', () => {
+describe('trades under the cap', () => {
+  const worstOf = (f: Franchise, t: number) => [...f.teams[t].roster].sort((a, b) => monOf(f, a).ovr - monOf(f, b).ovr);
+  const bestOf = (f: Franchise, t: number) => [...f.teams[t].roster].sort((a, b) => monOf(f, b).ovr - monOf(f, a).ovr);
+
+  it('takes uneven trades: two of mine for one of theirs', () => {
     const f = league();
-    const them = f.teams[1];
-    const mine = [...f.teams[0].roster].sort((a, b) => monOf(f, a).ovr - monOf(f, b).ovr)[0];
-    const theirs = [...them.roster].sort((a, b) => monOf(f, b).ovr - monOf(f, a).ovr)[0];
-    const dry = judgeTrade(f, 1, [mine], [theirs], 0);
-    expect(dry.ok).toBe(false); // my worst for their best: no chance
-    f.teams[0].cash = 1000;
-    const sweet = judgeTrade(f, 1, [mine], [theirs], 1000);
-    expect(sweet.ok).toBe(true);
-    expect(makeTrade(f, 1, [mine], [theirs], 1000)).toBe(true);
-    expect(f.teams[0].roster).toContain(theirs);
-    expect(cashOf(f.teams[0])).toBe(0);
-    expect(cashOf(them)).toBe(1000 + SEASON_BUDGET);
+    const give = bestOf(f, 0).slice(0, 2); // my two best for their best: they'll take that
+    const get = [bestOf(f, 1)[0]];
+    expect(judgeTrade(f, 1, give, get).ok).toBe(true);
+    expect(makeTrade(f, 1, give, get)).toBe(true);
+    expect(f.teams[0].roster).toHaveLength(9);
+    expect(f.teams[1].roster).toHaveLength(11);
+    expect(f.teams[0].roster).toContain(get[0]);
   });
 
-  it('refuses cash you do not have', () => {
+  it('blocks a trade that would bust the cap', () => {
     const f = league();
-    expect(judgeTrade(f, 1, [f.teams[0].roster[0]], [f.teams[1].roster[0]], 99).ok).toBe(false);
+    const get = bestOf(f, 1).slice(0, 2);
+    for (const u of get) f.players[u].salary = 8; // two $8M contracts coming in
+    const v = judgeTrade(f, 1, worstOf(f, 0).slice(0, 1), get);
+    expect(v.ok).toBe(false);
+    expect(v.reason).toContain('cap');
+  });
+
+  it('a GM pays real value for cap relief: a lesser player buys out a bad contract', () => {
+    const f = league();
+    for (const u of f.teams[0].roster) f.players[u].salary = 0.3; // plenty of cap room on my side
+    const them = f.teams[1];
+    const mine = worstOf(f, 0)[0];
+    f.players[mine].bonus = { spd: -10, sht: -10, ins: -10, pas: -10, def: -10, blk: -10, reb: -10, hnd: -10 }; // clearly the lesser player
+    const junk = worstOf(f, 1)[0];
+    f.players[junk].salary = 0.3;
+    expect(judgeTrade(f, 1, [mine], [junk]).ok).toBe(false); // even salaries: a worse player is refused
+    // The same player on a deal bad enough that shedding it covers the value gap: now they say yes.
+    const gap = tradeValue(f, junk, them) * 1.05 - tradeValue(f, mine, them);
+    f.players[junk].salary = Math.round((0.3 + gap / 12 + 0.5) * 10) / 10;
+    expect(judgeTrade(f, 1, [mine], [junk]).ok).toBe(true);
+  });
+
+  it('keeps rosters inside the bounds', () => {
+    const f = league();
+    const give = worstOf(f, 0).slice(0, 3); // 10 -> 7 would fall below the minimum
+    expect(judgeTrade(f, 1, give, []).ok).toBe(false);
+    expect(judgeTrade(f, 1, give, []).reason).toContain('between');
+  });
+
+  it('cash plays no part in trades anymore', () => {
+    const f = league();
+    const give = bestOf(f, 0).slice(0, 2);
+    const get = [bestOf(f, 1)[0]];
+    const before = [cashOf(f.teams[0]), cashOf(f.teams[1])];
+    expect(makeTrade(f, 1, give, get)).toBe(true);
+    expect([cashOf(f.teams[0]), cashOf(f.teams[1])]).toEqual(before);
   });
 });
 
@@ -158,16 +191,16 @@ describe('AI trade offers', () => {
     expect(f.teams[o!.team].roster).toContain(o!.give[0]);
   });
 
-  it('accepting swaps the players and pays the cash', () => {
+  it('accepting swaps the players, no cash involved', () => {
     const f = league();
     maybeAiOffer(f, () => 0.1);
     const o = f.offers![0];
-    const { give, get, cash, team } = o;
+    const { give, get, team } = o;
     const myCash = cashOf(f.teams[0]);
     expect(acceptOffer(f)).toBe(true);
-    expect(f.teams[0].roster).toContain(give[0]);
+    for (const u of give) expect(f.teams[0].roster).toContain(u);
     expect(f.teams[team].roster).toContain(get[0]);
-    expect(cashOf(f.teams[0])).toBeCloseTo(myCash + cash, 1);
+    expect(cashOf(f.teams[0])).toBe(myCash);
     expect(f.offers).toEqual([]);
   });
 

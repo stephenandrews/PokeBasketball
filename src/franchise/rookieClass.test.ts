@@ -26,7 +26,7 @@ function runSeason(f: Franchise): { dexes: number[]; rostered: Set<number> } {
   const rostered = new Set(f.teams.flatMap((t) => dexOf(f, t.roster)));
   while (rookieOnClock(f)) rookiePick(f);
   const me = f.teams[0];
-  finishRookieDraft(f, me.roster.reduce((a, b) => (tradeValue(f, b) < tradeValue(f, a) ? b : a)));
+  finishRookieDraft(f, [me.roster.reduce((a, b) => (tradeValue(f, b) < tradeValue(f, a) ? b : a))]);
   return { dexes, rostered };
 }
 
@@ -113,7 +113,7 @@ describe('rookie class variety', () => {
         expect(f.players[u].level).toBe(1);
       }
       while (rookieOnClock(f)) rookiePick(f);
-      finishRookieDraft(f, f.teams[0].roster[0]);
+      finishRookieDraft(f, [f.teams[0].roster[0]]);
     }
     const sd = (xs: number[]) => { const m = xs.reduce((a, b) => a + b) / xs.length; return Math.sqrt(xs.reduce((a, b) => a + (b - m) ** 2, 0) / xs.length); };
     expect(Math.max(...pots)).toBeLessThanOrEqual(91);

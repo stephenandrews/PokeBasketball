@@ -56,7 +56,8 @@ if (MODE_ADS) void import('./ads/board').then((b) => b.startLiveAds());
 // shell and, once told the page is idle, pulls every sprite into its cache ('warm').
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').then((reg) => {
+    // The build id in the URL steps around stale CDN copies: every deploy is a new sw.js.
+    navigator.serviceWorker.register(`sw.js?v=${typeof __PJ_BUILD__ === 'string' ? __PJ_BUILD__ : 'dev'}`).then((reg) => {
       const warm = () => reg.active?.postMessage('warm');
       if (reg.active) setTimeout(warm, 4000);
       else navigator.serviceWorker.addEventListener('controllerchange', () => setTimeout(warm, 4000), { once: true });

@@ -36,7 +36,9 @@ const PRECACHE = ${JSON.stringify(precache)};
 const WARM = ${JSON.stringify(warm)};
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(SHELL).then((c) => c.addAll(PRECACHE)).then(() => self.skipWaiting()));
+  // The ?v= query defeats stale CDN copies: a new build always precaches fresh files.
+  // Lookups use ignoreSearch, so plain requests still hit these entries.
+  e.waitUntil(caches.open(SHELL).then((c) => c.addAll(PRECACHE.map((u) => u + '?v=' + VERSION))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (e) => {
@@ -47,6 +49,9 @@ self.addEventListener('activate', (e) => {
   );
 });
 
+// Never store an empty or failed response: a CDN hiccup must not poison offline play.
+const cacheable = (res) => res && res.ok && res.headers.get('content-length') !== '0';
+
 // The page asks for this once it is idle: pull every sprite into the runtime cache so the
 // whole game works offline. Already-cached files are skipped; failures are quietly retried
 // on the next visit.
@@ -55,7 +60,10 @@ self.addEventListener('message', (e) => {
   e.waitUntil(caches.open(RUNTIME).then(async (c) => {
     for (const url of WARM) {
       if (await c.match(url)) continue;
-      try { await c.add(url); } catch { /* offline or missing: next visit retries */ }
+      try {
+        const res = await fetch(url);
+        if (cacheable(res)) await c.put(url, res);
+      } catch { /* offline or missing: next visit retries */ }
     }
   }));
 });
@@ -72,8 +80,8 @@ self.addEventListener('fetch', (e) => {
   if (req.mode === 'navigate') {
     e.respondWith(
       fetch(req)
-        .then((res) => { const copy = res.clone(); caches.open(SHELL).then((c) => c.put(req, copy)); return res; })
-        .catch(() => caches.match(req).then((hit) => hit || caches.match('index.html'))),
+        .then((res) => { if (cacheable(res)) { const copy = res.clone(); caches.open(SHELL).then((c) => c.put(req, copy)); } return res; })
+        .catch(() => caches.match(req, { ignoreSearch: true }).then((hit) => hit || caches.match('index.html', { ignoreSearch: true }))),
     );
     return;
   }
@@ -81,8 +89,8 @@ self.addEventListener('fetch', (e) => {
   // Everything else (bundle, fonts, sprites, audio): cache first, fill the cache from the
   // network on a miss.
   e.respondWith(
-    caches.match(req).then((hit) => hit || fetch(req).then((res) => {
-      if (res.ok) { const copy = res.clone(); caches.open(RUNTIME).then((c) => c.put(req, copy)); }
+    caches.match(req, { ignoreSearch: true }).then((hit) => hit || fetch(req).then((res) => {
+      if (cacheable(res)) { const copy = res.clone(); caches.open(RUNTIME).then((c) => c.put(req, copy)); }
       return res;
     })),
   );

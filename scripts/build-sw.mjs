@@ -88,7 +88,7 @@ self.addEventListener('fetch', (e) => {
 
   // Media that never changes between builds (sprites, audio, badges, fonts): cache first
   // into the long-lived runtime cache.
-  if (/^(sprites|announcer|ranks)\//.test(path) || path.endsWith('.woff2')) {
+  if (/^(sprites|announcer|ranks)\\//.test(path) || path.endsWith('.woff2')) {
     e.respondWith(
       caches.match(req, { ignoreSearch: true }).then((hit) => hit || fetch(req).then((res) => {
         if (cacheable(res)) { const copy = res.clone(); caches.open(RUNTIME).then((c) => c.put(req, copy)); }
@@ -108,5 +108,7 @@ self.addEventListener('fetch', (e) => {
 });
 `;
 
+// A worker with a syntax error registers as nothing at all: refuse to ship one.
+new Function(sw);
 writeFileSync(join(dist, 'sw.js'), sw);
 console.log(`sw: precache ${precache.length} files, warm ${warm.length} sprites (build ${buildId})`);

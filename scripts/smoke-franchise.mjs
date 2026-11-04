@@ -13,6 +13,7 @@ const chrome = process.env.CHROME || (c ? join(dir, c, 'chrome-linux64/chrome') 
 
 const browser = await chromium.launch({ executablePath: chrome });
 const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+page.on('crash', () => { console.log('✗ PAGE CRASHED'); process.exit(1); });
 const fails = [];
 const check = (name, ok) => { console.log(`${ok ? '✓' : '✗'} ${name}`); if (!ok) fails.push(name); };
 

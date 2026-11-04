@@ -1,6 +1,6 @@
 import { POSITIONS, monByDex, spriteUrl, type Pos } from '../data/pokemon';
 import {
-  badgesEarned, canSign, canTrade, finalWeek, judgeTrade, lineupOf, makeTrade, resetLineup, swapInLineup, tradeDeadline, venueOf, monOf, perGame, sign, standings, teamOvrOf, userGame, weekGames, weekLabel,
+  acceptOffer, badgesEarned, canSign, canTrade, cashOf, declineOffer, finalWeek, fmtM, judgeTrade, lineupOf, makeTrade, payrollOf, resetLineup, salaryOf, setCaptain, signingFee, swapInLineup, tradeDeadline, venueOf, monOf, perGame, sign, standings, teamOvrOf, userGame, weekGames, weekLabel,
   xpToNext, type FGame, type FTeam, type Franchise,
 } from '../franchise/league';
 import { badgeSvg } from '../ui/badges';
@@ -14,6 +14,10 @@ export interface HubActions {
   simMine(g: FGame): void;
   watchMine(g: FGame): void;
   simWeek(): void;
+  /** Sim every remaining game straight through the final. */
+  simSeason(): void;
+  /** A closed practice session with your own squad on your private court. */
+  practice(): void;
   /** Start or resume the offseason rookie draft. */
   rookies(): void;
   /** Every game this season, with box scores. */
@@ -99,6 +103,32 @@ export function nextCard(f: Franchise, settings: Settings): string {
         <button class="btn primary big" data-a="play">Play game</button>
         <button class="btn" data-a="watch-mine">Watch</button>
         <button class="btn" data-a="sim-mine">Sim game</button>
+        ${f.phase === 'season' ? '<button class="btn ghost" data-a="sim-season" title="Sim every remaining game, playoffs included">Sim season</button>' : ''}
+        <button class="btn ghost" data-a="practice" title="A closed session on your private court: everyone earns a little XP">Practice</button>
+      </div>
+    </section>`;
+}
+
+/** A rival GM's trade offer, if one came in this week. */
+function offerHtml(f: Franchise): string {
+  const o = f.offers?.[0];
+  if (!o || !canTrade(f)) return '';
+  const them = f.teams[o.team];
+  const who = (u: string) => {
+    const m = monOf(f, u);
+    return `<li><img src="${spriteUrl(m.dex)}" alt=""><span>${esc(m.name)}<small>${m.pos} · Lv ${f.players[u].level} · ${fmtM(salaryOf(f, u))}/yr</small><span class="types">${typeChips(m)}</span></span><b class="t-${tier(m.ovr)}">${m.ovr}</b></li>`;
+  };
+  return `
+    <section class="card offer" style="--tc:${them.color}">
+      <h3 class="sec">Trade offer · ${esc(them.name)}</h3>
+      <p class="note">${esc(them.leader ?? them.name)} offers:</p>
+      <div class="offer-cols">
+        <div><h4>You get</h4><ul>${o.give.map(who).join('')}${o.cash ? `<li class="cash-line"><b>+ ${fmtM(o.cash)}</b></li>` : ''}</ul></div>
+        <div><h4>You give</h4><ul>${o.get.map(who).join('')}</ul></div>
+      </div>
+      <div class="actions">
+        <button class="btn primary" data-a="offer-accept">Accept trade</button>
+        <button class="btn ghost" data-a="offer-decline">Decline</button>
       </div>
     </section>`;
 }
@@ -159,15 +189,16 @@ function rosterHtml(f: Franchise, editing: boolean, picked: string | null): stri
     const mpg = p.stats.gp ? `${((p.stats.sec ?? 0) / 60 / p.stats.gp).toFixed(1)}` : '–';
     const bi = bench.indexOf(u);
     const inj = p.injury ?? 0;
-    const tag = inj > 0 ? `<b class="out">OUT ${inj} WK</b> · ` : bi >= 0 ? `${ordinalOf(bi)} · ` : '';
+    const capt = me.captain === u;
+    const tag = inj > 0 ? `<b class="out">OUT ${inj} WK</b> · ` : (p.rust ?? 0) > 0 ? `<b class="rusty" title="Shaking off an injury: ratings are down until the rust wears off">RUSTY</b> · ` : bi >= 0 ? `${ordinalOf(bi)} · ` : '';
     return `
       <tr class="${editing ? 'pickable' : ''} ${picked === u ? 'picked' : ''}" ${editing ? `data-lu="${u}" tabindex="0"` : ''}>
-        <th><div><img src="${spriteUrl(m.dex)}" alt=""><span>${esc(m.name)}<small>${tag}${m.pos} · ${m.archetype}</small></span></div></th>
+        <th><div><img src="${spriteUrl(m.dex)}" alt=""><span>${capt ? '<b class="capt" title="Team captain">C</b> ' : ''}${esc(m.name)}<small>${tag}${m.pos} · ${m.archetype} · ${fmtM(salaryOf(f, u))}/yr·${p.years ?? 1}y</small><span class="types">${typeChips(m)}</span></span></div></th>
         <td class="lv">Lv ${p.level}<i style="--v:${(p.xp / xpToNext(p.level)) * 100}%"></i></td>
         <td><b class="t-${tier(m.ovr)}">${m.ovr}</b></td>
         ${bench.length ? `<td class="opt">${staminaOf(m)}</td><td>${mpg}</td>` : ''}
         <td>${p.stats.gp ? fmt(pg.ppg) : '–'}</td><td class="opt">${p.stats.gp ? fmt(pg.rpg) : '–'}</td><td class="opt">${p.stats.gp ? fmt(pg.apg) : '–'}</td>
-        <td>${open ? `<button class="btn small ghost" data-swap="${u}">Swap</button>` : ''}</td>
+        <td>${editing ? `<button class="btn small ghost" data-capt="${u}" title="Captains give the whole team +1 in games and let you call plays (1-4)">${capt ? 'Unmake captain' : 'Make captain'}</button>` : open ? `<button class="btn small ghost" data-swap="${u}">Swap</button>` : ''}</td>
       </tr>`;
   };
   const cols = bench.length ? 10 : 8;
@@ -195,7 +226,7 @@ function rosterHtml(f: Franchise, editing: boolean, picked: string | null): stri
           <tbody>${rows}</tbody>
         </table>
       </div>
-      <p class="note">${signable ? 'You can swap one player for a free agent this week.' : f.phase === 'done' ? 'Free agency reopens next season.' : "You've used this week's free-agent signing."} ${f.phase === 'season' ? (canTrade(f) ? `Trade deadline: after week ${tradeDeadline(f)}. ` : 'The trade deadline has passed. ') : ''}${bench.length ? (me.lineup ? 'Your lineup is set. ' : 'The coach starts the best five that cover every position. ') + 'With Subs on Auto, tired players come out at dead balls, 6th man first. ' : ''}Pokémon earn XP every game, more with more minutes; some evolve when they level up.</p>
+      <p class="note">${signable ? 'You can swap one player for a free agent this week (their first-year salary comes out of your cash).' : f.phase === 'done' ? 'Free agency reopens next season.' : "You've used this week's free-agent signing."} ${f.phase === 'season' ? (canTrade(f) ? `Trade deadline: after week ${tradeDeadline(f)}. ` : 'The trade deadline has passed. ') : ''}${bench.length ? (me.lineup ? 'Your lineup is set. ' : 'The coach starts the best five that cover every position. ') + 'With Subs on Auto, tired players come out at dead balls, 6th man first. ' : ''}${me.captain ? `${esc(monOf(f, me.captain).name)} is your captain: +1 to everyone in games, and plays (1-4) while they're on the floor. ` : 'Pick a captain in Edit lineup: +1 to everyone in games, and you can call plays. '}Pokémon earn XP every game, more with more minutes; some evolve when they level up. Veterans may retire after their fourth season, and injuries leave rust (and add up).</p>
     </section>`;
 }
 
@@ -247,11 +278,11 @@ function scoresHtml(f: Franchise): string {
     </section>`;
 }
 
-interface TradeDraft { team: number; give: string[]; get: string[] }
+interface TradeDraft { team: number; give: string[]; get: string[]; cash: number }
 
 function tradeSheet(f: Franchise, tr: TradeDraft): string {
   const them = f.teams[tr.team];
-  const verdict = judgeTrade(f, tr.team, tr.give, tr.get);
+  const verdict = judgeTrade(f, tr.team, tr.give, tr.get, tr.cash);
   const row = (u: string, side: 'give' | 'get') => {
     const m = monOf(f, u);
     const p = f.players[u];
@@ -259,12 +290,13 @@ function tradeSheet(f: Franchise, tr: TradeDraft): string {
     const inj = p.injury ?? 0;
     return `<li><button class="trade-row ${on ? 'on' : ''}" data-${side}="${u}">
       <img src="${spriteUrl(m.dex)}" alt="">
-      <span class="nm">${esc(m.name)}<small>${m.pos} · Lv ${p.level}${inj ? ` · <b class="out">OUT ${inj} WK</b>` : ''}</small></span>
+      <span class="nm">${esc(m.name)}<small>${m.pos} · Lv ${p.level} · ${fmtM(salaryOf(f, u))}/yr${inj ? ` · <b class="out">OUT ${inj} WK</b>` : ''}</small><span class="types">${typeChips(m)}</span></span>
       <b class="t-${tier(m.ovr)}">${m.ovr}</b>
     </button></li>`;
   };
   const sortByOvr = (us: string[]) => [...us].sort((a, b) => monOf(f, b).ovr - monOf(f, a).ovr);
   const pct = Math.round((verdict.lean + 1) * 50);
+  const myCash = cashOf(f.teams[0]);
   return `
     <div class="sheet-bg">
       <div class="sheet trade-sheet" role="dialog" aria-label="Trade">
@@ -272,10 +304,16 @@ function tradeSheet(f: Franchise, tr: TradeDraft): string {
         <h3>Trade</h3>
         <div class="trade-teams">${f.teams.filter((t) => !t.human).map((t) =>
           `<button class="${t.id === tr.team ? 'on' : ''}" data-tteam="${t.id}" style="--tc:${t.color}" title="${esc(t.name)}">${esc(t.abbr)}</button>`).join('')}</div>
-        <p class="note">${esc(them.name)}${them.leader ? ` (${esc(them.leader)})` : ''}${them.types?.length ? ` likes ${them.types.join('/')} types` : ''}. Pick the same number of players on each side, up to two.</p>
+        <p class="note">${esc(them.name)}${them.leader ? ` (${esc(them.leader)})` : ''}${them.types?.length ? ` likes ${them.types.join('/')} types` : ''}. Pick the same number of players on each side, up to two. Salaries travel with the players.</p>
         <div class="trade-cols">
           <div><h4>You give</h4><ul>${sortByOvr(f.teams[0].roster).map((u) => row(u, 'give')).join('')}</ul></div>
           <div><h4>You get</h4><ul>${sortByOvr(them.roster).map((u) => row(u, 'get')).join('')}</ul></div>
+        </div>
+        <div class="trade-cash">
+          <span>Sweeten with cash <small>(you have ${fmtM(myCash)})</small></span>
+          <button class="btn small ghost" data-cash="-1" ${tr.cash <= 0 ? 'disabled' : ''}>−</button>
+          <b>${fmtM(tr.cash)}</b>
+          <button class="btn small ghost" data-cash="1" ${tr.cash >= Math.floor(myCash) ? 'disabled' : ''}>+</button>
         </div>
         <div class="verdict ${verdict.ok ? 'ok' : ''}">
           <div class="meter"><i style="--v:${pct}%"></i></div>
@@ -293,16 +331,19 @@ function freeAgentSheet(f: Franchise, release: string, pos: Pos | 'ALL'): string
   const goal = targetPer(f.teams[0].roster.length);
   const wants = new Set(POSITIONS.filter((p) => countAt(after, p) < goal));
   const fas = [...f.freeAgents].filter((u) => pos === 'ALL' || monOf(f, u).pos === pos).sort((a, b) => monOf(f, b).ovr - monOf(f, a).ovr);
+  const myCash = cashOf(f.teams[0]);
   return `
     <div class="sheet-bg">
       <div class="sheet" role="dialog" aria-label="Free agents">
         <button class="close" data-a="close-fa" aria-label="Close">×</button>
         <h3>Swap out ${esc(out.name)} (${out.pos}, ${out.ovr})</h3>
-        <p class="note">Pick a free agent to sign. ${esc(out.name)} goes to free agency.${wants.size ? ` You'd be short at <b>${[...wants].join(', ')}</b>.` : ''}</p>
+        <p class="note">Pick a free agent to sign: their first-year salary comes out of your cash (${fmtM(myCash)} on hand). ${esc(out.name)} goes to free agency.${wants.size ? ` You'd be short at <b>${[...wants].join(', ')}</b>.` : ''}</p>
         <div class="filters">${(['ALL', ...POSITIONS] as const).map((p) => `<button data-fapos="${p}" class="${p === pos ? 'on' : ''} ${p !== 'ALL' && wants.has(p) ? 'need' : ''}">${p}</button>`).join('')}</div>
         <ul class="fa-list">${fas.map((u) => {
           const m = monOf(f, u);
-          return `<li><img src="${spriteUrl(m.dex)}" alt=""><span class="nm">${esc(m.name)}<small>${m.pos} · ${m.archetype} · Lv ${f.players[u].level}${wants.has(m.pos) ? ' · <b class="fits">Fills a need</b>' : ''}</small><span class="types">${typeChips(m)}</span></span><b class="t-${tier(m.ovr)}">${m.ovr}</b><button class="btn small primary" data-sign="${u}">Sign</button></li>`;
+          const fee = signingFee(f, u);
+          const broke = fee > myCash;
+          return `<li><img src="${spriteUrl(m.dex)}" alt=""><span class="nm">${esc(m.name)}<small>${m.pos} · ${m.archetype} · Lv ${f.players[u].level} · ${fmtM(fee)}/yr${wants.has(m.pos) ? ' · <b class="fits">Fills a need</b>' : ''}</small><span class="types">${typeChips(m)}</span></span><b class="t-${tier(m.ovr)}">${m.ovr}</b><button class="btn small primary" data-sign="${u}" ${broke ? 'disabled title="Not enough cash"' : ''}>Sign ${fmtM(fee)}</button></li>`;
         }).join('')}</ul>
       </div>
     </div>`;
@@ -327,10 +368,12 @@ export function hubScreen(root: HTMLElement, f: Franchise, settings: Settings, a
           <button class="btn ghost small" data-a="menu">Menu</button>
           <div>
             <h1>${esc(me.name)}${f.pokejamMaster !== undefined ? ' <span class="master-mark" title="Won the title with every badge">PokeBBall Master</span>' : ''}</h1>
-            <p>Season ${f.season} · ${f.phase === 'done' ? 'Offseason' : weekLabel(f)} · ${rec(me)}, ${ordinal(place)} place</p>
+            <p>Season ${f.season} · ${f.phase === 'done' ? 'Offseason' : weekLabel(f)} · ${rec(me)}, ${ordinal(place)} place · <b class="cash" title="Cash on hand. Every team banks $10M at each season tipoff, minus payroll.">${fmtM(cashOf(me))}</b> <small>payroll ${fmtM(payrollOf(f, me))}/yr</small></p>
           </div>
+          ${f.signature ? `<img class="owner-sig" src="${f.signature}" alt="Owner's signature" title="The owner's signature, from the day the franchise was founded">` : ''}
         </header>
         ${nextCard(f, settings)}
+        ${offerHtml(f)}
         ${badgeCaseHtml(f)}
         <div class="hub-grid">
           <div class="col">${rosterHtml(f, editing, picked)}${scoresHtml(f)}</div>
@@ -367,6 +410,13 @@ export function hubScreen(root: HTMLElement, f: Franchise, settings: Settings, a
       render();
       return;
     }
+    const capt = t.closest<HTMLElement>('[data-capt]')?.dataset.capt;
+    if (capt) {
+      setCaptain(f, capt);
+      act.saved();
+      render();
+      return;
+    }
     const add = t.closest<HTMLElement>('[data-sign]')?.dataset.sign;
     if (add && swapping) {
       sign(f, swapping, add);
@@ -382,19 +432,23 @@ export function hubScreen(root: HTMLElement, f: Franchise, settings: Settings, a
       const give = t.closest<HTMLElement>('[data-give]')?.dataset.give;
       const get = t.closest<HTMLElement>('[data-get]')?.dataset.get;
       const team = t.closest<HTMLElement>('[data-tteam]')?.dataset.tteam;
+      const cash = t.closest<HTMLElement>('[data-cash]')?.dataset.cash;
       if (give) tr.give = toggle(tr.give, give);
       else if (get) tr.get = toggle(tr.get, get);
-      else if (team) trading = { team: Number(team), give: tr.give, get: [] };
+      else if (cash) tr.cash = Math.max(0, tr.cash + Number(cash));
+      else if (team) trading = { team: Number(team), give: tr.give, get: [], cash: tr.cash };
       else if (t.closest('[data-a="close-trade"]')) trading = null;
-      else if (t.closest('[data-a="propose"]') && makeTrade(f, tr.team, tr.give, tr.get)) {
+      else if (t.closest('[data-a="propose"]') && makeTrade(f, tr.team, tr.give, tr.get, tr.cash)) {
         trading = null;
         act.saved();
       }
-      if (give || get || team || !trading) { render(); return; }
+      if (give || get || team || cash || !trading) { render(); return; }
     }
     const a = t.closest<HTMLElement>('[data-a]')?.dataset.a;
     const g = userGame(f);
-    if (a === 'trade') { trading = { team: 1, give: [], get: [] }; render(); return; }
+    if (a === 'trade') { trading = { team: 1, give: [], get: [], cash: 0 }; render(); return; }
+    if (a === 'offer-accept') { acceptOffer(f); act.saved(); render(); return; }
+    if (a === 'offer-decline') { declineOffer(f); act.saved(); render(); return; }
     if (a === 'lineup-edit') { editing = true; picked = null; render(); return; }
     if (a === 'lineup-done') { editing = false; picked = null; render(); return; }
     if (a === 'lineup-auto') { resetLineup(f); editing = false; picked = null; act.saved(); render(); return; }
@@ -404,6 +458,8 @@ export function hubScreen(root: HTMLElement, f: Franchise, settings: Settings, a
     else if (a === 'sim-mine' && g) act.simMine(g);
     else if (a === 'watch-mine' && g) act.watchMine(g);
     else if (a === 'sim-week') act.simWeek();
+    else if (a === 'sim-season') act.simSeason();
+    else if (a === 'practice') act.practice();
     else if (a === 'rookies') act.rookies();
     else if (a === 'games') act.games();
   });

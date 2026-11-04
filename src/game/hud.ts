@@ -1,4 +1,4 @@
-import { spriteUrl, type PokeType } from '../data/pokemon';
+import { TYPE_COLORS, spriteUrl, type PokeType } from '../data/pokemon';
 import { esc } from '../util';
 import type { Game } from './game';
 import type { GameEvent, Grade, Player } from './types';
@@ -59,6 +59,7 @@ export class Hud {
         <img alt="" data-k="pimg">
         <div class="pinfo">
           <div class="pname"><span data-k="pname"></span><span class="povr" data-k="povr"></span></div>
+          <div class="ptypes types" data-k="ptypes"></div>
           <div class="bar turbo"><i data-k="turbo"></i><b>TURBO</b></div>
           <div class="bar spec"><i data-k="spec"></i><b data-k="specname">SPECIAL</b></div>
           ${g.cfg.stamina ? '<div class="bar energy"><i data-k="energy"></i><b>ENERGY</b></div>' : ''}
@@ -206,9 +207,10 @@ export class Hud {
       if (this.cardDex !== u.mon.dex) {
         this.cardDex = u.mon.dex;
         (this.q('pimg') as HTMLImageElement).src = spriteUrl(u.mon.dex);
-        this.set('pname', u.mon.name.toUpperCase());
+        this.set('pname', `${u.mon.capt ? 'Ⓒ ' : ''}${u.mon.name.toUpperCase()}`);
         this.set('povr', `${u.mon.pos} ${u.mon.ovr}`);
         this.set('specname', u.mon.move);
+        this.q('ptypes').innerHTML = u.mon.types.map((t) => `<i style="--tc:${TYPE_COLORS[t]}">${t}</i>`).join('');
       }
       this.q('turbo').style.width = `${(u.fx.surge > 0 || u.fire ? 1 : u.turbo) * 100}%`;
       this.q('spec').style.width = `${u.special * 100}%`;

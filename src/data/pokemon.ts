@@ -33,6 +33,10 @@ export interface Mon {
   archetype: string;
   special: SpecialKind;
   move: string;
+  /** Career injuries (franchise): each one makes the next a little more likely. */
+  frail?: number;
+  /** Team captain (franchise): the team gets +1 to every rating while they play, and plays can be called. */
+  capt?: boolean;
 }
 
 export const RATING_LABELS: Record<keyof Ratings, string> = {
@@ -333,7 +337,8 @@ export function monByDex(dex: number): Mon {
 export function withBonus(dex: number, bonus: Partial<Ratings>): Mon {
   const base = monByDex(dex);
   const r = { ...base.r };
-  for (const k of Object.keys(bonus) as (keyof Ratings)[]) r[k] = Math.min(99, r[k] + (bonus[k] ?? 0));
+  // The floor matters for negative bonuses (injury rust in franchise mode).
+  for (const k of Object.keys(bonus) as (keyof Ratings)[]) r[k] = Math.max(1, Math.min(99, r[k] + (bonus[k] ?? 0)));
   const ovr = overall(base.pos, r);
   return { ...base, r, ovr, archetype: archetype(base.pos, r, ovr), size: sizeOf(dex, r) };
 }

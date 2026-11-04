@@ -261,6 +261,11 @@ export interface Ball {
 
 export type Grade = 'perfect' | 'good' | 'early' | 'late' | 'very-early' | 'very-late' | 'layup' | 'dunk';
 
+/** A set play the user calls on offense while their captain is on the floor. */
+export type PlayCall = 'iso' | 'screen' | 'three' | 'post';
+export const PLAY_CALLS: readonly PlayCall[] = ['iso', 'screen', 'three', 'post'];
+export const PLAY_NAMES: Record<PlayCall, string> = { iso: 'Iso', screen: 'Screen', three: 'Three hunt', post: 'Post up' };
+
 export type GameEvent =
   | { kind: 'score'; player: Player; points: number; how: 'jump' | 'layup' | 'dunk' }
   | { kind: 'miss'; player: Player; airball: boolean }

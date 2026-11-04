@@ -6,7 +6,7 @@ import { ReplayRecorder } from '../game/replay';
 import { Input } from '../game/input';
 import { Renderer } from '../game/render';
 import { preload } from '../game/sprites';
-import { emptyIntent, type GameConfig, type GameEvent, type Intent, type Player, type TeamId } from '../game/types';
+import { PLAY_CALLS, PLAY_NAMES, emptyIntent, type GameConfig, type GameEvent, type Intent, type PlayCall, type Player, type TeamId } from '../game/types';
 import { spriteUrl } from '../data/pokemon';
 import { esc } from '../util';
 import { Voice, sharedVoice } from '../game/voice';
@@ -195,6 +195,27 @@ export function playGame(
     renderSubs();
   });
 
+  // ---- set plays (offline games with a captain on the user's team) ----
+  const playsOn = !online && !spectator && cfg.home.human && !cfg.practice
+    && [...cfg.home.roster, ...(cfg.home.bench ?? [])].some((m) => m.capt);
+  const playsBar = document.createElement('div');
+  if (playsOn) {
+    playsBar.className = 'plays-bar';
+    playsBar.innerHTML = PLAY_CALLS.map((k, i) => `<button class="play-chip" data-play="${k}"><i>${i + 1}</i>${PLAY_NAMES[k]}</button>`).join('');
+    gameEl.appendChild(playsBar);
+    playsBar.addEventListener('click', (e) => {
+      const k = (e.target as HTMLElement).closest<HTMLElement>('[data-play]')?.dataset.play as PlayCall | undefined;
+      if (k) g.callPlay(k);
+    });
+  }
+  const syncPlays = () => {
+    if (!playsOn) return;
+    // Plays need the captain on the floor and the ball: hide the bar otherwise.
+    const usable = g.phase !== 'final' && g.offense === 0 && g.captainOnFloor(0);
+    playsBar.classList.toggle('off', !usable || menuOpen());
+    for (const b of playsBar.querySelectorAll<HTMLElement>('[data-play]')) b.classList.toggle('on', g.play === b.dataset.play);
+  };
+
   const speedBtn = root.querySelector<HTMLButtonElement>('[data-a="speed"]');
   speedBtn?.addEventListener('click', () => {
     speed = nextSpeed(speed);
@@ -228,6 +249,8 @@ export function playGame(
   });
   const onKey = (e: KeyboardEvent) => {
     if (menuOpen() && (e.code === 'Escape' || e.code === 'KeyP')) setPaused(false);
+    // 1-4 call set plays (when the captain is on the floor).
+    if (playsOn && !menuOpen() && /^(Digit|Numpad)[1-4]$/.test(e.code)) g.callPlay(PLAY_CALLS[Number(e.code.slice(-1)) - 1]);
   };
   window.addEventListener('keydown', onKey);
   const onVis = () => { if (document.hidden && g.phase !== 'final' && !online) setPaused(true); };
@@ -358,6 +381,7 @@ export function playGame(
     }
     renderer.draw(g, g.paused ? 0 : dt);
     hud.update(g.paused ? 0 : dt);
+    syncPlays();
     raf = requestAnimationFrame(frame);
   };
   raf = requestAnimationFrame(frame);
